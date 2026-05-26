@@ -105,3 +105,13 @@ To run DropLink as a lightweight command-line tool (e.g. on a headless Linux ser
 *   **The Fix**:
     - Add `width: 100%; max-width: 100%; overflow-x: hidden;` to both **`html`** and **`body`** in CSS.
     - Set `.file-card { min-width: 0; }` and `.file-details { overflow: hidden; min-width: 0; }` to force browser engines to cleanly truncate long text with an ellipsis `...` inside flex layouts.
+
+---
+
+## 📜 Git Commit Guidelines
+
+When generating or executing Git commits for this repository, always append the following exact co-author attribution line to the very bottom of the commit message footer (separated by an empty line):
+
+```text
+Co-authored-by: Antigravity <noreply@google.com>
+```
