@@ -113,5 +113,5 @@ To run DropLink as a lightweight command-line tool (e.g. on a headless Linux ser
 When generating or executing Git commits for this repository, always append the following exact co-author attribution line to the very bottom of the commit message footer (separated by an empty line):
 
 ```text
-Co-authored-by: Antigravity <noreply@google.com>
+Co-authored-by: Antigravity <antigravity@users.noreply.github.com>
 ```
