@@ -9,6 +9,10 @@ let mainWindow = null;
 let splashWindow = null;
 let tray = null;
 let isQuitting = false;
+const appIconPath = process.platform === 'win32'
+  ? path.join(__dirname, 'assets', 'icon.ico')
+  : path.join(__dirname, 'assets', 'icon.png');
+const trayIconPath = path.join(__dirname, 'assets', 'icon-tray.png');
 
 // Dynamic uploads folder in user's system Downloads folder
 const uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
@@ -186,6 +190,7 @@ function createMainWindow() {
     center: true,
     show: false,
     title: 'DropLink',
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -254,10 +259,7 @@ function createMainWindow() {
  * Creates the Windows System Tray interface.
  */
 function createSystemTray() {
-  // 16x16 solid violet logo PNG base64 for self-contained packaging robustness
-  const base64Icon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZklEQVQ4T2NkoBAwUqifgWoGzGdgYGBg+M/A8J+BzEBkMEzMz5cMDGNYGBgYGLAZcOm/AwPDfwwDkQEkA9wZGBj+Y3PAlwEjgwMjA0EDwEADFmID6JpBeLVDN4PwacdpAIOiHkOFAABu3x4h+T2y2AAAAABJRU5ErkJggg==';
-  
-  const icon = nativeImage.createFromDataURL(base64Icon);
+  const icon = nativeImage.createFromPath(trayIconPath);
   tray = new Tray(icon);
   tray.setToolTip('DropLink File Transfer');
 

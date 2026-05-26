@@ -24,6 +24,7 @@
       "output": "dist-electron"
     },
     "files": [
+      "assets/**/*",
       "dist/**/*",
       "public/**/*",
       "main.js",
@@ -31,7 +32,8 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
