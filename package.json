@@ -41,7 +41,13 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DropLink"
+      "shortcutName": "DropLink",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "veera-bharath",
+      "repo": "droplink"
     }
   },
   "keywords": [
