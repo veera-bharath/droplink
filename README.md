@@ -8,6 +8,8 @@
 
 DropLink is a modern, high-performance, and beautifully styled local network file sharing desktop application. It allows you to instantly and securely transfer massive files (up to **2GB**) between your mobile devices and your PC over the same local Wi-Fi network—**consuming zero internet bandwidth and with zero cloud dependency**.
 
+### 📦 [Download Latest Release for Windows (v1.0.0)](https://github.com/veera-bharath/droplink/releases/download/v1.0.0/DropLink-Setup-1.0.0.exe)
+
 ---
 
 ## ✨ Features
