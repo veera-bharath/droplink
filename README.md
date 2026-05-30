@@ -14,13 +14,13 @@ DropLink is a modern, high-performance, and beautifully styled local network fil
 
 - **🚀 Native Desktop App Shell**: Wrapped in a modern, borderless Electron wrapper for a native Windows software feel.
 - **🛡️ Double-Ended Session Security**: Auto-generates a secure, 6-character uppercase security token upon launch. Direct scans of the QR code pre-authenticate mobile devices instantly. 
-- **💻 Host Auto-Login**: The app automatically logs you in when opened on `localhost` (the hosting PC), but requires verification for external local Wi-Fi clients.
+- **💻 Host Auto-Login**: The app automatically logs you in when opened on `127.0.0.1` (the hosting PC), but requires verification for external local Wi-Fi clients.
 - **📂 Native Windows Downloads Directory**: Uploaded files automatically stream directly into your local `C:\Users\<Name>\Downloads\DropLink` directory rather than hiding in temporary app caches.
 - **🔌 EXDEV Multi-Drive Fallback**: Robust, enterprise-grade handling for cross-device filesystem moves. If your project is hosted on a secondary partition (e.g. `D:\`), uploads are cleanly copied and unlinked across volumes onto your primary `C:\` drive Downloads folder.
 - **🔄 Live WebSocket Sync**: A lightweight, native WebSocket connection keeps all connected devices updated in real-time. Files uploaded or deleted on your phone immediately appear or disappear on your PC without page refreshes.
 - **🎛️ Windows System Tray Minimizing**: Closing the window minimizes the application into your Windows System Tray next to your clock, keeping your file-sync server running continuously in the background.
-- **⌛ Splash Screen & Port Pinging**: Auto-spawns a borderless loading splash screen at boot, running an active HTTP TCP-ping loop to ensure the Express backend is fully active before displaying the main window.
-- **🎨 Slate Glassmorphic Design**: Curated, tailormade HSL color systems, responsive fluid grid layouts, touch-friendly list rows, and smooth micro-animations.
+- **⌛ Solid Splash Screen & Port Pinging**: Auto-spawns a modern solid rectangular loading splash screen displaying the official logo (loaded dynamically via Base64 data URLs) and a brand blue loader, running an active `127.0.0.1` TCP-ping loop to bypass loopback DNS hostname resolution conflicts (IPv4 vs. IPv6 `::1`) on Windows.
+- **🎨 Premium Blue Glassmorphic Design**: Curated HSL brand blue accents, responsive fluid grid layouts, modern inline SVG vector headers (replacing legacy emojis), and smooth micro-animations.
 
 ---
 
