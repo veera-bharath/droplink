@@ -95,7 +95,7 @@ function createSplashWindow() {
     width: 450,
     height: 300,
     frame: false,
-    transparent: true,
+    transparent: false,
     alwaysOnTop: true,
     resizable: false,
     center: true,
@@ -120,12 +120,12 @@ function createSplashWindow() {
   }
 
   const logoHtml = iconBase64
-    ? `<img src="data:image/png;base64,${iconBase64}" alt="DropLink Icon" style="width: 100%; height: 100%; object-fit: cover;">`
-    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; color: white;">
+    ? `<img src="data:image/png;base64,${iconBase64}" alt="DropLink Icon" style="width: 100%; height: 100%; object-fit: contain;">`
+    : `<div style="width: 64px; height: 64px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; color: white;">
         <path d="M12 2v12M8 10l4 4 4-4M4 20h16"/>
-      </svg>`;
+      </svg></div>`;
 
-  // Self-contained elegant dark glassmorphic loading screen HTML markup
+  // Self-contained elegant dark loading screen HTML markup
   const splashHtml = `
     <!DOCTYPE html>
     <html>
@@ -134,7 +134,7 @@ function createSplashWindow() {
         html, body {
           margin: 0;
           padding: 0;
-          background: transparent !important;
+          background: #0d0e15;
           overflow: hidden;
           width: 100%;
           height: 100%;
@@ -144,30 +144,24 @@ function createSplashWindow() {
           font-family: 'Segoe UI', Roboto, sans-serif;
         }
         .splash-card {
-          width: calc(100% - 24px);
-          height: calc(100% - 24px);
-          background: rgba(13, 14, 21, 0.98);
+          width: 100%;
+          height: 100%;
+          background: #0d0e15;
           color: #f1f3f9;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          border-radius: 20px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
           box-sizing: border-box;
+          border: 1px solid rgba(255, 255, 255, 0.06);
         }
         .logo {
           width: 64px;
           height: 64px;
-          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-          border-radius: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
           margin-bottom: 20px;
-          overflow: hidden;
         }
         h2 {
           margin: 0 0 8px 0;
@@ -194,7 +188,7 @@ function createSplashWindow() {
         .loader-fill {
           height: 100%;
           width: 50%;
-          background: #6366f1;
+          background: #0066f5;
           border-radius: 50px;
           position: absolute;
           animation: load 1.5s infinite ease-in-out;
