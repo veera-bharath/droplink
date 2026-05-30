@@ -16,6 +16,8 @@ const trayIconPath = path.join(__dirname, 'assets', 'icon-tray.png');
 
 // Dynamic uploads folder in user's system Downloads folder
 const uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
+// Dynamic log path in user AppData folder
+const logPath = path.join(app.getPath('userData'), 'server.log');
 
 /**
  * Spawns the background TypeScript-compiled Node.js Express server.
@@ -24,28 +26,51 @@ function startBackgroundServer() {
   if (serverProcess) return;
 
   console.log('Spawning backend Express server...');
-  const serverPath = path.join(__dirname, 'dist/server/index.js');
+  const serverPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar', 'dist', 'server', 'index.js')
+    : path.join(__dirname, 'dist', 'server', 'index.js');
+  const publicDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar', 'public')
+    : path.join(__dirname, 'public');
   
   // Create uploads folder recursively if missing
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
+  // Setup logging stream
+  const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+  logStream.write(`\n--- Server Spawning: ${new Date().toISOString()} ---\n`);
+  logStream.write(`Server Path: ${serverPath}\n`);
+  logStream.write(`Public Dir: ${publicDir}\n`);
+  logStream.write(`Uploads Dir: ${uploadsDir}\n`);
+
   // Pass dynamic uploads path and set NODE_ENV to production
   serverProcess = fork(serverPath, [], {
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      DROPLINK_UPLOADS_DIR: uploadsDir
+      DROPLINK_UPLOADS_DIR: uploadsDir,
+      DROPLINK_PUBLIC_DIR: publicDir
     },
-    stdio: ['inherit', 'inherit', 'inherit', 'ipc']
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc']
+  });
+
+  serverProcess.stdout.on('data', (data) => {
+    logStream.write(data);
+  });
+
+  serverProcess.stderr.on('data', (data) => {
+    logStream.write(data);
   });
 
   serverProcess.on('error', (err) => {
+    logStream.write(`Server process error: ${err.message}\n`);
     console.error('Server process error:', err);
   });
 
   serverProcess.on('exit', (code) => {
+    logStream.write(`Server process exited with code ${code}\n`);
     console.log(`Server process exited with code ${code}`);
     serverProcess = null;
   });
@@ -199,7 +224,7 @@ function createMainWindow() {
   });
 
   // Load local Express URL
-  mainWindow.loadURL('http://localhost:3000');
+  mainWindow.loadURL('http://127.0.0.1:3000');
 
   // Hide custom default application menu, leaving basic shortcuts active
   const menuTemplate = [
@@ -312,11 +337,61 @@ function pingServerAndLoadUI(retries = 30) {
     if (splashWindow && !splashWindow.isDestroyed()) {
       splashWindow.destroy();
     }
-    app.quit();
+    if (!mainWindow) {
+      mainWindow = new BrowserWindow({
+        width: 1050,
+        height: 750,
+        center: true,
+        title: 'DropLink',
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false
+        }
+      });
+      mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body {
+                margin: 0;
+                font-family: Segoe UI, sans-serif;
+                background: #0d0e15;
+                color: #f1f3f9;
+                display: grid;
+                place-items: center;
+                min-height: 100vh;
+              }
+              .card {
+                max-width: 560px;
+                padding: 32px;
+                border-radius: 20px;
+                background: rgba(255,255,255,0.04);
+                border: 1px solid rgba(255,255,255,0.08);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+              }
+              h1 { margin: 0 0 12px; font-size: 24px; }
+              p { margin: 0; line-height: 1.6; color: #cbd5e1; }
+              code { color: #93c5fd; }
+            </style>
+          </head>
+          <body>
+             <div class="card">
+               <h1>DropLink could not start the local server</h1>
+               <p>The background server failed to initialize in time.</p>
+               <p style="margin-top: 16px;">You can inspect the exact error log at:</p>
+               <code style="display: block; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-top: 8px; word-break: break-all; font-family: monospace; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);">${logPath}</code>
+             </div>
+          </body>
+        </html>
+      `)}`);
+      mainWindow.show();
+    }
     return;
   }
 
-  http.get('http://localhost:3000/config', (res) => {
+  http.get('http://127.0.0.1:3000/config', (res) => {
     if (res.statusCode === 200) {
       console.log('Local Express server is fully initialized!');
       createMainWindow();

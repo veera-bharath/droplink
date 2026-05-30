@@ -6,7 +6,7 @@
   "bin": "dist/server/index.js",
   "scripts": {
     "dev": "npm run server:build && electron .",
-    "start": "electron .",
+    "start": "npm run server:build && electron .",
     "build": "tsc && electron-builder --win",
     "server:dev": "ts-node-dev --respawn --transpile-only server/index.ts",
     "server:build": "rimraf dist && tsc",
@@ -20,6 +20,7 @@
   "build": {
     "appId": "com.droplink.app",
     "productName": "DropLink",
+
     "directories": {
       "output": "dist-electron"
     },

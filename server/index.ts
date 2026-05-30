@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import http from 'http';
-import { exec } from 'child_process';
 import QRCode from 'qrcode';
 import fileRouter from './routes/fileRoutes';
 import { NetworkService } from './services/networkService';
@@ -16,11 +15,10 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Resolve static assets supporting packaged standalone binaries (.exe)
-const isPackaged = typeof (process as any).pkg !== 'undefined';
-const staticPath = isPackaged
-  ? path.join(__dirname, '../public') // inside virtual package relative to dist/server
-  : path.join(process.cwd(), 'public'); // dev mode/normal node runtime
+// Resolve static assets from the path provided by the Electron main process.
+const staticPath =
+  process.env.DROPLINK_PUBLIC_DIR ||
+  path.join(process.cwd(), 'public');
 
 app.use(express.static(staticPath));
 
@@ -84,16 +82,4 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('======================================================');
   console.log(`🔗 Scanning QR Code on UI auto-authenticates mobile devices!`);
   console.log('======================================================\n');
-
-  // Auto-open browser on startup for non-technical users
-  const connectionUrl = `http://localhost:${PORT}`;
-  const startCommand = process.platform === 'win32'
-    ? `start ${connectionUrl}`
-    : process.platform === 'darwin'
-      ? `open ${connectionUrl}`
-      : `xdg-open ${connectionUrl}`;
-      
-  exec(startCommand, (err) => {
-    if (err) console.error('Failed to auto-open browser:', err.message);
-  });
 });
