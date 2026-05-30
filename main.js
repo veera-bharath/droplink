@@ -106,27 +106,56 @@ function createSplashWindow() {
     }
   });
 
+  // Read application icon and transpile to Base64 for data URL compatibility
+  let iconBase64 = '';
+  try {
+    const iconFilePath = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar', 'assets', 'icon.png')
+      : path.join(__dirname, 'assets', 'icon.png');
+    if (fs.existsSync(iconFilePath)) {
+      iconBase64 = fs.readFileSync(iconFilePath).toString('base64');
+    }
+  } catch (err) {
+    console.error('Failed to convert splash icon to base64:', err);
+  }
+
+  const logoHtml = iconBase64
+    ? `<img src="data:image/png;base64,${iconBase64}" alt="DropLink Icon" style="width: 100%; height: 100%; object-fit: cover;">`
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; color: white;">
+        <path d="M12 2v12M8 10l4 4 4-4M4 20h16"/>
+      </svg>`;
+
   // Self-contained elegant dark glassmorphic loading screen HTML markup
   const splashHtml = `
     <!DOCTYPE html>
     <html>
     <head>
       <style>
-        body {
+        html, body {
           margin: 0;
           padding: 0;
+          background: transparent !important;
+          overflow: hidden;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-family: 'Segoe UI', Roboto, sans-serif;
-          background: rgba(13, 14, 21, 0.95);
+        }
+        .splash-card {
+          width: calc(100% - 24px);
+          height: calc(100% - 24px);
+          background: rgba(13, 14, 21, 0.98);
           color: #f1f3f9;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          height: 100vh;
           border-radius: 20px;
           border: 1px solid rgba(255, 255, 255, 0.08);
-          overflow: hidden;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          box-sizing: border-box;
         }
         .logo {
           width: 64px;
@@ -138,11 +167,7 @@ function createSplashWindow() {
           justify-content: center;
           box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
           margin-bottom: 20px;
-        }
-        .logo svg {
-          width: 32px;
-          height: 32px;
-          color: white;
+          overflow: hidden;
         }
         h2 {
           margin: 0 0 8px 0;
@@ -182,15 +207,15 @@ function createSplashWindow() {
       </style>
     </head>
     <body>
-      <div class="logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2v12M8 10l4 4 4-4M4 20h16"/>
-        </svg>
-      </div>
-      <h2>DropLink</h2>
-      <p>Initializing local network servers...</p>
-      <div class="loader">
-        <div class="loader-fill"></div>
+      <div class="splash-card">
+        <div class="logo">
+          ${logoHtml}
+        </div>
+        <h2>DropLink</h2>
+        <p>Initializing local network servers...</p>
+        <div class="loader">
+          <div class="loader-fill"></div>
+        </div>
       </div>
     </body>
     </html>
