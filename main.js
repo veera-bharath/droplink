@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -15,7 +15,7 @@ const appIconPath = process.platform === 'win32'
 const trayIconPath = path.join(__dirname, 'assets', 'icon-tray.png');
 
 // Dynamic uploads folder in user's system Downloads folder
-const uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
+let uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
 // Dynamic log path in user AppData folder
 const logPath = path.join(app.getPath('userData'), 'server.log');
 
@@ -458,6 +458,34 @@ ipcMain.on('open-downloads', () => {
     fs.mkdirSync(uploadsDir, { recursive: true });
     shell.openPath(uploadsDir);
   }
+});
+
+// IPC handler to open native directory picker and set custom uploads directory
+ipcMain.handle('select-directory', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Save Directory',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  
+  const selectedPath = result.filePaths[0];
+  uploadsDir = selectedPath;
+  
+  // Ensure the new directory exists
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Notify background Express server process
+  if (serverProcess && serverProcess.connected) {
+    serverProcess.send({ type: 'SET_UPLOADS_DIR', path: uploadsDir });
+  }
+
+  return uploadsDir;
 });
 
 // App Exit Handler

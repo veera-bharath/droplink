@@ -4,6 +4,7 @@ import path from 'path';
 import http from 'http';
 import QRCode from 'qrcode';
 import fileRouter from './routes/fileRoutes';
+import { FileController } from './controllers/fileController';
 import { NetworkService } from './services/networkService';
 import { TokenService } from './services/tokenService';
 import { WebSocketService } from './services/websocketService';
@@ -51,6 +52,7 @@ app.get('/config', async (req, res) => {
       token: isLocalhost ? token : null, // Securely hide from external Wi-Fi scanners
       connectionUrl,
       qrCode: qrCodeBase64,
+      uploadsDir: FileController.getUploadsDir(),
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to generate connection config: ' + error.message });
@@ -70,6 +72,14 @@ const server = http.createServer(app);
 
 // Initialize real-time WebSocket syncing
 WebSocketService.init(server);
+
+// Listen for background child-process IPC messages to update uploads directory at runtime
+process.on('message', (message: any) => {
+  if (message && message.type === 'SET_UPLOADS_DIR' && typeof message.path === 'string') {
+    console.log(`[IPC] Updating active uploads directory to: ${message.path}`);
+    FileController.setUploadsDir(message.path);
+  }
+});
 
 // Boot the server
 server.listen(PORT, '0.0.0.0', () => {

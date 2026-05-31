@@ -284,6 +284,33 @@ body {
   margin-bottom: 1.2rem;
 }
 
+.folder-path-strip {
+  padding: 0.6rem 1.5rem;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-path-strip svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.folder-path-strip span:last-of-type {
+  font-family: 'Fira Code', monospace;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* -------------------------------------------------------------
  * COMPONENT: SECURITY ACCESS WIDGET
  * ------------------------------------------------------------- */

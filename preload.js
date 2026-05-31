@@ -5,5 +5,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   
   // Sends a message to main process to open the native DropLink downloads folder
-  openDownloads: () => ipcRenderer.send('open-downloads')
+  openDownloads: () => ipcRenderer.send('open-downloads'),
+  
+  // Triggers native directory picker dialog and returns the selected path
+  selectDirectory: () => ipcRenderer.invoke('select-directory')
 });
