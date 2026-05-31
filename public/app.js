@@ -11,7 +11,8 @@ const state = {
   connectionUrl: '',
   files: [],
   socket: null,
-  activeUploads: new Map() // Tracks ongoing uploads by file name
+  activeUploads: new Map(), // Tracks ongoing uploads by file name
+  uploadsDir: ''
 };
 
 // DOM Elements
@@ -31,7 +32,10 @@ const DOM = {
   filesGrid: document.querySelector('#files-grid'),
   filesCount: document.querySelector('#files-count'),
   searchInput: document.querySelector('#search-input'),
-  toastContainer: document.querySelector('#toast-container')
+  toastContainer: document.querySelector('#toast-container'),
+  btnChangeDownloads: document.querySelector('#btn-change-downloads'),
+  activeFolderPathContainer: document.querySelector('#active-folder-path-container'),
+  activeFolderPath: document.querySelector('#active-folder-path')
 };
 
 // -------------------------------------------------------------
@@ -131,6 +135,21 @@ function getFileIcon(category) {
   }
 }
 
+function updateFolderPathDisplay() {
+  if (window.electronAPI && window.electronAPI.isElectron && state.uploadsDir) {
+    if (DOM.activeFolderPath) {
+      DOM.activeFolderPath.innerText = state.uploadsDir;
+    }
+    if (DOM.activeFolderPathContainer) {
+      DOM.activeFolderPathContainer.style.display = 'flex';
+    }
+  } else {
+    if (DOM.activeFolderPathContainer) {
+      DOM.activeFolderPathContainer.style.display = 'none';
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // INITIALIZATION & SERVER SYNC
 // -------------------------------------------------------------
@@ -144,6 +163,10 @@ async function initApp() {
     state.serverIp = config.ip;
     state.serverPort = config.port;
     state.connectionUrl = config.connectionUrl;
+    state.uploadsDir = config.uploadsDir || '';
+    
+    // Render save directory if inside Electron
+    updateFolderPathDisplay();
 
     // Render QR Code Image
     if (config.qrCode) {
@@ -648,6 +671,25 @@ document.addEventListener('DOMContentLoaded', () => {
       btnOpenDownloads.style.display = 'inline-flex';
       btnOpenDownloads.addEventListener('click', () => {
         window.electronAPI.openDownloads();
+      });
+    }
+
+    const btnChangeDownloads = document.querySelector('#btn-change-downloads');
+    if (btnChangeDownloads) {
+      btnChangeDownloads.style.display = 'inline-flex';
+      btnChangeDownloads.addEventListener('click', async () => {
+        try {
+          const selectedPath = await window.electronAPI.selectDirectory();
+          if (selectedPath) {
+            state.uploadsDir = selectedPath;
+            updateFolderPathDisplay();
+            showToast('Save directory updated successfully!', 'success');
+            // Refresh directory contents to load files from the new path
+            loadFiles(true);
+          }
+        } catch (err) {
+          showToast('Failed to change save directory: ' + err.message, 'error');
+        }
       });
     }
   }

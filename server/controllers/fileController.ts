@@ -3,13 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { WebSocketService } from '../services/websocketService';
 
-const UPLOADS_DIR = process.env.DROPLINK_UPLOADS_DIR || path.join(process.cwd(), 'uploads');
-
-// Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
 /**
  * Sanitizes a filename to make it safe for server storage and URL downloading.
  * It filters out risky path traversal sequences and replaces whitespace with underscores.
@@ -25,20 +18,37 @@ export function sanitizeFilename(filename: string): string {
 }
 
 export class FileController {
+  private static _uploadsDir: string = process.env.DROPLINK_UPLOADS_DIR || path.join(process.cwd(), 'uploads');
+
+  public static getUploadsDir(): string {
+    if (!fs.existsSync(FileController._uploadsDir)) {
+      fs.mkdirSync(FileController._uploadsDir, { recursive: true });
+    }
+    return FileController._uploadsDir;
+  }
+
+  public static setUploadsDir(newPath: string): void {
+    FileController._uploadsDir = newPath;
+    if (!fs.existsSync(newPath)) {
+      fs.mkdirSync(newPath, { recursive: true });
+    }
+  }
+
   /**
    * Returns a JSON array of all files inside /uploads.
    */
   public static listFiles(req: Request, res: Response): void {
     try {
-      if (!fs.existsSync(UPLOADS_DIR)) {
+      const uploadsDir = FileController.getUploadsDir();
+      if (!fs.existsSync(uploadsDir)) {
         res.json([]);
         return;
       }
 
-      const files = fs.readdirSync(UPLOADS_DIR);
+      const files = fs.readdirSync(uploadsDir);
       const fileList = files
         .map((filename) => {
-          const filePath = path.join(UPLOADS_DIR, filename);
+          const filePath = path.join(uploadsDir, filename);
           if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
             return null;
           }
@@ -73,11 +83,12 @@ export class FileController {
       }
 
       const savedNames: string[] = [];
+      const uploadsDir = FileController.getUploadsDir();
 
       for (const file of uploadedFiles) {
         const sanitized = sanitizeFilename(file.originalname);
         const originalPath = file.path;
-        const targetPath = path.join(UPLOADS_DIR, sanitized);
+        const targetPath = path.join(uploadsDir, sanitized);
 
         // Keep naming unique to prevent silent overrides
         let uniquePath = targetPath;
@@ -88,7 +99,7 @@ export class FileController {
           const ext = path.extname(sanitized);
           const base = path.basename(sanitized, ext);
           uniqueName = `${base}_${counter}${ext}`;
-          uniquePath = path.join(UPLOADS_DIR, uniqueName);
+          uniquePath = path.join(uploadsDir, uniqueName);
           counter++;
         }
 
@@ -124,7 +135,8 @@ export class FileController {
   public static downloadFile(req: Request, res: Response): void {
     try {
       const filename = path.basename(req.params.filename);
-      const filePath = path.join(UPLOADS_DIR, filename);
+      const uploadsDir = FileController.getUploadsDir();
+      const filePath = path.join(uploadsDir, filename);
 
       if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
         res.status(404).json({ error: 'File does not exist or has been removed.' });
@@ -143,7 +155,8 @@ export class FileController {
   public static deleteFile(req: Request, res: Response): void {
     try {
       const filename = path.basename(req.params.filename);
-      const filePath = path.join(UPLOADS_DIR, filename);
+      const uploadsDir = FileController.getUploadsDir();
+      const filePath = path.join(uploadsDir, filename);
 
       if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
         res.status(404).json({ error: 'File does not exist or was already deleted.' });
