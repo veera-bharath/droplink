@@ -8,6 +8,7 @@ import { FileController } from './controllers/fileController';
 import { NetworkService } from './services/networkService';
 import { TokenService } from './services/tokenService';
 import { WebSocketService } from './services/websocketService';
+import { MetadataService } from './services/metadataService';
 
 const app = express();
 const PORT = 3000;
@@ -72,6 +73,9 @@ const server = http.createServer(app);
 
 // Initialize real-time WebSocket syncing
 WebSocketService.init(server);
+
+// Initialize metadata tracking scavenger daemon
+MetadataService.init();
 
 // Listen for background child-process IPC messages to update uploads directory at runtime
 process.on('message', (message: any) => {

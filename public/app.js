@@ -400,6 +400,7 @@ function renderFiles() {
             <span>•</span>
             <span>${formatDate(file.date)}</span>
           </div>
+          ${renderSelfDestructBadge(file)}
         </div>
       </div>
       <div class="file-actions">
@@ -429,6 +430,8 @@ function renderFiles() {
 
     DOM.filesGrid.appendChild(card);
   });
+
+  startCountdownTimer();
 }
 
 function escapeHtml(string) {
@@ -446,6 +449,32 @@ function uploadFiles(selectedFiles) {
 
   const filesArray = Array.from(selectedFiles);
   if (filesArray.length === 0) return;
+
+  // Extract self-destruct settings
+  const selfDestructToggle = document.querySelector('#self-destruct-toggle');
+  const selfDestructTypeSelect = document.querySelector('#self-destruct-type');
+  
+  const isSelfDestruct = selfDestructToggle ? selfDestructToggle.checked : false;
+  let selfDestructType = 'download';
+  let selfDestructValue = 0;
+  
+  if (isSelfDestruct && selfDestructTypeSelect) {
+    const selectVal = selfDestructTypeSelect.value;
+    if (selectVal.startsWith('timer_')) {
+      selfDestructType = 'timer';
+      selfDestructValue = parseInt(selectVal.split('_')[1], 10);
+    } else {
+      selfDestructType = 'download';
+      selfDestructValue = 1;
+    }
+  }
+
+  // Reset toggle and panel visually for the next upload
+  if (selfDestructToggle) {
+    selfDestructToggle.checked = false;
+    const settingsPanel = document.querySelector('#self-destruct-settings');
+    if (settingsPanel) settingsPanel.style.display = 'none';
+  }
 
   // Filter 2GB limit
   const maxLimit = 2 * 1024 * 1024 * 1024;
@@ -563,8 +592,80 @@ function uploadFiles(selectedFiles) {
     // Assemble payload
     const formData = new FormData();
     formData.append('files', file);
+    formData.append('selfDestruct', isSelfDestruct ? 'true' : 'false');
+    formData.append('selfDestructType', selfDestructType);
+    formData.append('selfDestructValue', selfDestructValue.toString());
     xhr.send(formData);
   });
+}
+
+function renderSelfDestructBadge(file) {
+  if (!file.selfDestruct) return '';
+  
+  if (file.selfDestructType === 'download') {
+    const left = file.downloadsLeft ?? 1;
+    return `
+      <div class="self-destruct-badge badge-download" title="Self-destructs after download">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        </svg>
+        <span>${left} download${left === 1 ? '' : 's'} left</span>
+      </div>
+    `;
+  } else if (file.selfDestructType === 'timer' && file.expiresAt) {
+    return `
+      <div class="self-destruct-badge badge-timer" data-expires="${file.expiresAt}" title="Self-destructs on expiration">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="countdown-text">Expiring...</span>
+      </div>
+    `;
+  }
+  return '';
+}
+
+let countdownInterval = null;
+
+function startCountdownTimer() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+  
+  countdownInterval = setInterval(() => {
+    const badges = document.querySelectorAll('.badge-timer');
+    if (badges.length === 0) {
+      return;
+    }
+    
+    const now = new Date().getTime();
+    let needReload = false;
+    
+    badges.forEach(badge => {
+      const expiresTime = new Date(badge.getAttribute('data-expires')).getTime();
+      const diff = expiresTime - now;
+      
+      if (diff <= 0) {
+        const textEl = badge.querySelector('.countdown-text');
+        if (textEl) textEl.innerText = 'Expired';
+        needReload = true;
+      } else {
+        const totalSecs = Math.floor(diff / 1000);
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        const textEl = badge.querySelector('.countdown-text');
+        if (textEl) {
+          textEl.innerText = `Expires in ${timeStr}`;
+        }
+      }
+    });
+    
+    if (needReload) {
+      loadFiles(false);
+    }
+  }, 1000);
 }
 
 function checkActiveUploadsSection() {
@@ -607,6 +708,15 @@ async function confirmAndDeleteFile(filename) {
 // -------------------------------------------------------------
 function registerEvents() {
   
+  // Self-destruct options toggle listener
+  const selfDestructToggle = document.querySelector('#self-destruct-toggle');
+  const selfDestructSettings = document.querySelector('#self-destruct-settings');
+  if (selfDestructToggle && selfDestructSettings) {
+    selfDestructToggle.addEventListener('change', () => {
+      selfDestructSettings.style.display = selfDestructToggle.checked ? 'block' : 'none';
+    });
+  }
+
   // Save/Apply Token Manual Entry
   DOM.btnSaveToken.addEventListener('click', () => {
     const tokenVal = DOM.tokenInput.value.trim().toUpperCase();
