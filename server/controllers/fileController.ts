@@ -173,4 +173,24 @@ export class FileController {
       res.status(500).json({ error: 'Failed to delete file: ' + error.message });
     }
   }
+
+  /**
+   * Serves file inline for browser previews.
+   */
+  public static previewFile(req: Request, res: Response): void {
+    try {
+      const filename = path.basename(req.params.filename);
+      const uploadsDir = FileController.getUploadsDir();
+      const filePath = path.join(uploadsDir, filename);
+
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        res.status(404).json({ error: 'File does not exist or has been removed.' });
+        return;
+      }
+
+      res.sendFile(filePath);
+    } catch (error: any) {
+      res.status(500).json({ error: 'Failed to serve preview: ' + error.message });
+    }
+  }
 }
