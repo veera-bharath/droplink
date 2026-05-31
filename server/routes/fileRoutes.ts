@@ -59,6 +59,7 @@ router.use(authenticateToken);
 router.get('/files', FileController.listFiles);
 router.post('/upload', upload.array('files'), FileController.uploadFiles);
 router.get('/download/:filename', FileController.downloadFile);
+router.get('/preview/:filename', FileController.previewFile);
 router.delete('/file/:filename', FileController.deleteFile);
 
 export default router;

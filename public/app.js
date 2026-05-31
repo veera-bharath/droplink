@@ -35,7 +35,16 @@ const DOM = {
   toastContainer: document.querySelector('#toast-container'),
   btnChangeDownloads: document.querySelector('#btn-change-downloads'),
   activeFolderPathContainer: document.querySelector('#active-folder-path-container'),
-  activeFolderPath: document.querySelector('#active-folder-path')
+  activeFolderPath: document.querySelector('#active-folder-path'),
+  
+  // Lightbox Selectors
+  lightboxOverlay: document.querySelector('#preview-lightbox'),
+  lightboxIcon: document.querySelector('#lightbox-icon'),
+  lightboxFilename: document.querySelector('#lightbox-filename'),
+  lightboxBody: document.querySelector('#lightbox-body'),
+  btnLightboxDownload: document.querySelector('#btn-lightbox-download'),
+  btnLightboxDelete: document.querySelector('#btn-lightbox-delete'),
+  btnLightboxClose: document.querySelector('#btn-lightbox-close')
 };
 
 // -------------------------------------------------------------
@@ -107,9 +116,10 @@ function getFileCategory(filename) {
   const types = {
     image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'],
     video: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'wmv'],
+    audio: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'],
     document: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf'],
     archive: ['zip', 'rar', 'tar', 'gz', '7z', 'bz2'],
-    code: ['html', 'css', 'js', 'ts', 'json', 'py', 'java', 'cpp', 'c', 'sh', 'xml', 'md']
+    code: ['html', 'css', 'js', 'ts', 'json', 'py', 'java', 'cpp', 'c', 'sh', 'xml', 'md', 'env', 'gitignore', 'gitconfig', 'license']
   };
   
   for (const [key, extensions] of Object.entries(types)) {
@@ -124,6 +134,8 @@ function getFileIcon(category) {
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
     case 'video':
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
+    case 'audio':
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     case 'document':
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
     case 'archive':
@@ -391,6 +403,9 @@ function renderFiles() {
         </div>
       </div>
       <div class="file-actions">
+        <button class="action-btn btn-preview" data-filename="${escapeHtml(file.name)}" title="Preview">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
         <a class="action-btn btn-dl" href="/download/${encodeURIComponent(file.name)}?token=${state.token}" download title="Download">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         </a>
@@ -399,6 +414,12 @@ function renderFiles() {
         </button>
       </div>
     `;
+    
+    // Bind Preview handler
+    card.querySelector('.btn-preview').addEventListener('click', (e) => {
+      const filename = e.currentTarget.getAttribute('data-filename');
+      openPreview(filename);
+    });
     
     // Bind Delete handler
     card.querySelector('.btn-del').addEventListener('click', (e) => {
@@ -655,6 +676,167 @@ function registerEvents() {
       uploadFiles(e.dataTransfer.files);
     }
   });
+
+  // Close Lightbox from Close button
+  DOM.btnLightboxClose.addEventListener('click', () => {
+    closePreview();
+  });
+
+  // Close Lightbox from backdrop click
+  DOM.lightboxOverlay.querySelector('.lightbox-backdrop').addEventListener('click', () => {
+    closePreview();
+  });
+
+  // Close Lightbox on ESC key press
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && DOM.lightboxOverlay.classList.contains('active')) {
+      closePreview();
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// MEDIA PREVIEW LIGHTBOX CONTROLLER
+// -------------------------------------------------------------
+async function openPreview(filename) {
+  if (!state.token) {
+    showToast('Unauthorized: Please input the session token first.', 'error');
+    return;
+  }
+
+  const category = getFileCategory(filename);
+  const icon = getFileIcon(category);
+  const previewUrl = `/preview/${encodeURIComponent(filename)}?token=${state.token}`;
+  const downloadUrl = `/download/${encodeURIComponent(filename)}?token=${state.token}`;
+
+  // Update Lightbox Header Details
+  DOM.lightboxIcon.innerHTML = icon;
+  DOM.lightboxFilename.innerText = filename;
+  DOM.lightboxFilename.title = filename;
+
+  // Set action button attributes dynamically
+  DOM.btnLightboxDownload.onclick = () => {
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  DOM.btnLightboxDelete.onclick = () => {
+    closePreview();
+    confirmAndDeleteFile(filename);
+  };
+
+  // Render correct media element inside Lightbox Body based on category
+  DOM.lightboxBody.innerHTML = '';
+  
+  if (category === 'image') {
+    const img = document.createElement('img');
+    img.src = previewUrl;
+    img.alt = filename;
+    img.className = 'lightbox-image';
+    DOM.lightboxBody.appendChild(img);
+  } 
+  else if (category === 'video') {
+    const video = document.createElement('video');
+    video.src = previewUrl;
+    video.controls = true;
+    video.autoplay = true;
+    video.className = 'lightbox-video';
+    DOM.lightboxBody.appendChild(video);
+  } 
+  else if (category === 'audio') {
+    const audioContainer = document.createElement('div');
+    audioContainer.className = 'lightbox-audio-container';
+    
+    audioContainer.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+      </svg>
+      <audio src="${previewUrl}" controls class="lightbox-audio" autoplay></audio>
+    `;
+    DOM.lightboxBody.appendChild(audioContainer);
+  } 
+  else if (category === 'code' || filename.endsWith('.txt') || filename.endsWith('.log')) {
+    DOM.lightboxBody.innerHTML = `
+      <div class="files-status-message">
+        <div class="spinner"></div>
+        <p>Loading text contents...</p>
+      </div>
+    `;
+    
+    try {
+      const response = await fetch(previewUrl);
+      if (!response.ok) throw new Error('Failed to load file content.');
+      const text = await response.text();
+      
+      DOM.lightboxBody.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.className = 'lightbox-text-container';
+      pre.innerText = text;
+      DOM.lightboxBody.appendChild(pre);
+    } catch (err) {
+      DOM.lightboxBody.innerHTML = `
+        <div class="files-status-message">
+          <p style="color:var(--danger)">⚠️ Error loading preview: ${err.message}</p>
+        </div>
+      `;
+    }
+  } 
+  else if (filename.endsWith('.pdf')) {
+    const iframe = document.createElement('iframe');
+    iframe.src = previewUrl;
+    iframe.className = 'lightbox-pdf';
+    DOM.lightboxBody.appendChild(iframe);
+  } 
+  else {
+    const fallback = document.createElement('div');
+    fallback.className = 'lightbox-fallback';
+    fallback.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 0 0 2-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+      </svg>
+      <p style="font-weight: 600; font-size: 1.1rem; color: #fff; margin: 0;">Preview not supported for this file type</p>
+      <p style="font-size: 0.85rem; margin: 0 0 10px 0;">You can download it to view locally on your device.</p>
+    `;
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'btn btn-primary';
+    downloadBtn.style.padding = '8px 16px';
+    downloadBtn.innerHTML = `<span>Download File</span>`;
+    downloadBtn.onclick = () => {
+      DOM.btnLightboxDownload.click();
+    };
+    fallback.appendChild(downloadBtn);
+    
+    DOM.lightboxBody.appendChild(fallback);
+  }
+
+  DOM.lightboxOverlay.style.display = 'flex';
+  setTimeout(() => {
+    DOM.lightboxOverlay.classList.add('active');
+  }, 10);
+}
+
+function closePreview() {
+  if (!DOM.lightboxOverlay) return;
+  
+  DOM.lightboxOverlay.classList.remove('active');
+  
+  const video = DOM.lightboxBody.querySelector('video');
+  if (video) video.pause();
+  const audio = DOM.lightboxBody.querySelector('audio');
+  if (audio) audio.pause();
+  
+  const iframe = DOM.lightboxBody.querySelector('iframe');
+  if (iframe) iframe.src = 'about:blank';
+
+  setTimeout(() => {
+    DOM.lightboxOverlay.style.display = 'none';
+    DOM.lightboxBody.innerHTML = '';
+  }, 300);
 }
 
 // -------------------------------------------------------------
