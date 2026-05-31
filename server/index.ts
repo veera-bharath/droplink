@@ -44,16 +44,21 @@ app.get('/config', async (req, res) => {
       req.hostname === 'localhost' ||
       req.hostname === '127.0.0.1';
 
-    const connectionUrl = `http://${localIp}:${PORT}/?token=${token}`;
+    const activeToken = TokenService.isPasswordEnabled()
+      ? TokenService.getCustomPassword()
+      : TokenService.getSessionToken();
+
+    const connectionUrl = `http://${localIp}:${PORT}/?token=${activeToken}`;
     const qrCodeBase64 = await QRCode.toDataURL(connectionUrl);
 
     res.json({
       ip: localIp,
       port: PORT,
-      token: isLocalhost ? token : null, // Securely hide from external Wi-Fi scanners
+      token: isLocalhost ? activeToken : null, // Securely hide from external Wi-Fi scanners
       connectionUrl,
       qrCode: qrCodeBase64,
       uploadsDir: FileController.getUploadsDir(),
+      isPasswordSet: TokenService.isPasswordEnabled(),
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to generate connection config: ' + error.message });

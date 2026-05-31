@@ -25,7 +25,7 @@ const upload = multer({
 });
 
 /**
- * Middleware to validate the session token.
+ * Middleware to validate the session token or custom password.
  * It checks the 'X-Session-Token' header, 'Authorization' header, or 'token' query parameter.
  */
 export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
@@ -48,12 +48,43 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   if (TokenService.validateToken(token)) {
     next();
   } else {
-    res.status(401).json({ error: 'Unauthorized: Invalid or missing session token.' });
+    res.status(401).json({ error: 'Unauthorized: Invalid or missing security credentials.' });
   }
 }
 
-// Attach authentication middleware to all file routes
+// Public Password Status Check Route (Exempt from authentication)
+router.get('/password-config', (req: Request, res: Response) => {
+  res.json({ isPasswordSet: TokenService.isPasswordEnabled() });
+});
+
+// Attach authentication middleware to all subsequent routes
 router.use(authenticateToken);
+
+// Protected Password Configuration Route
+router.post('/password-config/set', (req: Request, res: Response) => {
+  try {
+    const { password } = req.body;
+
+    if (password !== undefined) {
+      if (password === null || password.trim() === '') {
+        TokenService.setCustomPassword(null);
+        res.status(200).json({ message: 'Custom password disabled successfully.' });
+      } else {
+        const cleanPassword = password.trim();
+        if (cleanPassword.length < 4) {
+          res.status(400).json({ error: 'Password must be at least 4 characters long.' });
+          return;
+        }
+        TokenService.setCustomPassword(cleanPassword);
+        res.status(200).json({ message: 'Custom password updated successfully.' });
+      }
+    } else {
+      res.status(400).json({ error: 'Password field is missing.' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update password: ' + error.message });
+  }
+});
 
 // Define Routes
 router.get('/files', FileController.listFiles);
@@ -63,3 +94,4 @@ router.get('/preview/:filename', FileController.previewFile);
 router.delete('/file/:filename', FileController.deleteFile);
 
 export default router;
+
