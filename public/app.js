@@ -13,7 +13,8 @@ const state = {
   socket: null,
   activeUploads: new Map(), // Tracks ongoing uploads by file name
   uploadQueue: [], // Tracks items in the upload queue
-  uploadsDir: ''
+  uploadsDir: '',
+  myUploads: new Set() // Tracks files uploaded by this specific client tab to prevent self-notification
 };
 
 const MAX_CONCURRENT_UPLOADS = 2;
@@ -40,6 +41,7 @@ const DOM = {
   btnChangeDownloads: document.querySelector('#btn-change-downloads'),
   activeFolderPathContainer: document.querySelector('#active-folder-path-container'),
   activeFolderPath: document.querySelector('#active-folder-path'),
+  notificationAlertsToggle: document.querySelector('#notification-alerts-toggle'),
   
   // Lightbox Selectors
   lightboxOverlay: document.querySelector('#preview-lightbox'),
@@ -80,6 +82,23 @@ function showToast(message, type = 'info') {
     toast.classList.add('toast-out');
     setTimeout(() => toast.remove(), 300);
   }, 3500);
+}
+
+function triggerNotification(title, body) {
+  // If running inside Electron, trigger native OS notification
+  if (window.electronAPI && window.electronAPI.showNotification) {
+    window.electronAPI.showNotification(title, body);
+  } 
+  // Otherwise, fallback to HTML5 Web Notification API
+  else if ('Notification' in window) {
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body, icon: '/assets/icon.png' });
+      } catch (err) {
+        console.error('Failed to trigger HTML5 notification:', err);
+      }
+    }
+  }
 }
 
 // -------------------------------------------------------------
@@ -231,7 +250,37 @@ async function initApp() {
       DOM.tokenInput.value = activeToken;
     }
 
-    // 3. Connect to WebSockets & load files
+    // 3. Initialize notification preferences state
+    if (DOM.notificationAlertsToggle) {
+      const storedPref = localStorage.getItem('droplink_notifications');
+      if (storedPref !== null) {
+        DOM.notificationAlertsToggle.checked = storedPref === 'true';
+      } else {
+        DOM.notificationAlertsToggle.checked = true; // Enabled by default
+      }
+      
+      DOM.notificationAlertsToggle.addEventListener('change', () => {
+        const isChecked = DOM.notificationAlertsToggle.checked;
+        localStorage.setItem('droplink_notifications', isChecked ? 'true' : 'false');
+        
+        if (isChecked && !window.electronAPI) {
+          // If in browser and enabling, request permission
+          if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+              if (permission !== 'granted') {
+                showToast('Notification permission denied.', 'info');
+                DOM.notificationAlertsToggle.checked = false;
+                localStorage.setItem('droplink_notifications', 'false');
+              } else {
+                showToast('Notification alerts enabled.', 'success');
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 4. Connect to WebSockets & load files
     connectWebSocket();
     loadFiles();
 
@@ -293,7 +342,26 @@ function connectWebSocket() {
         
         // Show context toast notifications
         if (data.payload.action === 'upload') {
-          showToast(`New file uploaded: ${data.payload.files.join(', ')}`, 'success');
+          const uploadedFiles = data.payload.files;
+          const externalFiles = [];
+          
+          uploadedFiles.forEach(filename => {
+            if (state.myUploads.has(filename)) {
+              state.myUploads.delete(filename); // Consume the token
+            } else {
+              externalFiles.push(filename);
+            }
+          });
+
+          showToast(`New file uploaded: ${uploadedFiles.join(', ')}`, 'success');
+
+          if (externalFiles.length > 0 && DOM.notificationAlertsToggle && DOM.notificationAlertsToggle.checked) {
+            const title = 'New File Received';
+            const body = externalFiles.length === 1 
+              ? `'${externalFiles[0]}' has been transferred from a connected device.`
+              : `${externalFiles.length} new files have been transferred from a connected device.`;
+            triggerNotification(title, body);
+          }
         } else if (data.payload.action === 'delete') {
           showToast(`File removed: ${data.payload.file}`, 'info');
         }
@@ -670,6 +738,7 @@ function startSingleUpload(item) {
     checkActiveUploadsSection();
 
     if (xhr.status === 200) {
+      state.myUploads.add(file.name);
       showToast(`'${file.name}' transferred successfully!`, 'success');
       loadFiles(false); // Silently reload
     } else {

@@ -8,5 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDownloads: () => ipcRenderer.send('open-downloads'),
   
   // Triggers native directory picker dialog and returns the selected path
-  selectDirectory: () => ipcRenderer.invoke('select-directory')
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  
+  // Sends a request to display a native OS desktop notification
+  showNotification: (title, body) => ipcRenderer.send('show-notification', { title, body })
 });
