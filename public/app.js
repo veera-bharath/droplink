@@ -12,8 +12,12 @@ const state = {
   files: [],
   socket: null,
   activeUploads: new Map(), // Tracks ongoing uploads by file name
+  uploadQueue: [], // Tracks items in the upload queue
   uploadsDir: ''
 };
+
+const MAX_CONCURRENT_UPLOADS = 2;
+
 
 // DOM Elements
 const DOM = {
@@ -493,110 +497,243 @@ function uploadFiles(selectedFiles) {
   safeFiles.forEach(file => {
     // Prevent double upload of same file concurrently
     if (state.activeUploads.has(file.name)) {
-      showToast(`File ${file.name} is already uploading.`, 'info');
+      showToast(`File ${file.name} is already uploading or queued.`, 'info');
       return;
     }
 
     const uploadId = 'up_' + Math.random().toString(36).substring(2, 9);
     state.activeUploads.set(file.name, uploadId);
 
-    // Create progress card element
+    // Create progress card element (starts in queued style)
     const uploadItem = document.createElement('div');
-    uploadItem.className = 'upload-item';
+    uploadItem.className = 'upload-item queued';
     uploadItem.id = uploadId;
     uploadItem.innerHTML = `
       <div class="upload-item-header">
-        <span class="upload-item-name">${escapeHtml(file.name)}</span>
-        <span class="upload-item-meta" id="${uploadId}_meta">0%</span>
+        <span class="upload-item-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+        <div class="upload-meta-wrapper">
+          <span class="upload-item-meta" id="${uploadId}_meta">Queued</span>
+          <button class="btn-cancel-upload" data-id="${uploadId}" title="Cancel upload">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="progress-track">
         <div class="progress-fill" id="${uploadId}_bar" style="width: 0%;"></div>
       </div>
       <div class="upload-item-footer">
-        <span class="upload-speed" id="${uploadId}_speed">Calculating speed...</span>
-        <span id="${uploadId}_eta">--:-- remaining</span>
+        <span class="upload-speed" id="${uploadId}_speed" style="color: var(--text-muted);">Waiting in queue...</span>
+        <span id="${uploadId}_eta">Pending</span>
       </div>
     `;
+    
+    // Add cancel handler to button
+    uploadItem.querySelector('.btn-cancel-upload').addEventListener('click', () => {
+      cancelUpload(uploadId);
+    });
+
     DOM.activeUploadsList.appendChild(uploadItem);
 
-    // Start AJAX File Upload
-    const xhr = new XMLHttpRequest();
-    const startTime = Date.now();
-    let lastTime = startTime;
-    let lastLoaded = 0;
+    // Push into the queue
+    state.uploadQueue.push({
+      id: uploadId,
+      file: file,
+      status: 'queued',
+      xhr: null,
+      selfDestruct: isSelfDestruct,
+      selfDestructType: selfDestructType,
+      selfDestructValue: selfDestructValue
+    });
+  });
 
-    xhr.open('POST', '/upload');
-    xhr.setRequestHeader('X-Session-Token', state.token);
+  // Kickoff queue processor
+  processUploadQueue();
+}
 
-    // Upload Progress handler
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const currentTime = Date.now();
-        const percent = Math.round((event.loaded / event.total) * 100);
+function processUploadQueue() {
+  // Count actively uploading tasks
+  const activeCount = state.uploadQueue.filter(item => item.status === 'uploading').length;
+
+  // Process next items if capacity exists
+  let availableSlots = MAX_CONCURRENT_UPLOADS - activeCount;
+  
+  if (availableSlots <= 0) return;
+
+  for (let i = 0; i < state.uploadQueue.length; i++) {
+    const item = state.uploadQueue[i];
+    if (item.status === 'queued') {
+      item.status = 'uploading';
+      startSingleUpload(item);
+      availableSlots--;
+      if (availableSlots <= 0) break;
+    }
+  }
+}
+
+function startSingleUpload(item) {
+  const uploadId = item.id;
+  const file = item.file;
+  const isSelfDestruct = item.selfDestruct;
+  const selfDestructType = item.selfDestructType;
+  const selfDestructValue = item.selfDestructValue;
+
+  const uploadItem = document.getElementById(uploadId);
+  if (uploadItem) {
+    // Transition visually out of queued state
+    uploadItem.classList.remove('queued');
+    const speedEl = document.getElementById(`${uploadId}_speed`);
+    if (speedEl) {
+      speedEl.style.color = ''; // Restore brand color
+      speedEl.innerText = 'Calculating speed...';
+    }
+    const etaEl = document.getElementById(`${uploadId}_eta`);
+    if (etaEl) {
+      etaEl.innerText = '--:-- remaining';
+    }
+    const metaEl = document.getElementById(`${uploadId}_meta`);
+    if (metaEl) {
+      metaEl.innerText = '0%';
+    }
+  }
+
+  // Create AJAX request
+  const xhr = new XMLHttpRequest();
+  item.xhr = xhr;
+  const startTime = Date.now();
+  let lastTime = startTime;
+  let lastLoaded = 0;
+
+  xhr.open('POST', '/upload');
+  xhr.setRequestHeader('X-Session-Token', state.token);
+
+  // Upload Progress handler
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable) {
+      const currentTime = Date.now();
+      const percent = Math.round((event.loaded / event.total) * 100);
+      
+      const barEl = document.getElementById(`${uploadId}_bar`);
+      if (barEl) barEl.style.width = `${percent}%`;
+
+      const metaEl = document.getElementById(`${uploadId}_meta`);
+      if (metaEl) {
+        metaEl.innerText = `${percent}% (${formatBytes(event.loaded)} / ${formatBytes(event.total)})`;
+      }
+
+      // Calculate speed (bytes per second) since last progress tick
+      const timeDiff = (currentTime - lastTime) / 1000; // in seconds
+      if (timeDiff >= 0.2) { // update speed details every 200ms
+        const loadedDiff = event.loaded - lastLoaded;
+        const speedBytesSec = loadedDiff / timeDiff;
         
-        // UI bar upgrades
-        document.getElementById(`${uploadId}_bar`).style.width = `${percent}%`;
-        document.getElementById(`${uploadId}_meta`).innerText = `${percent}% (${formatBytes(event.loaded)} / ${formatBytes(event.total)})`;
+        const speedEl = document.getElementById(`${uploadId}_speed`);
+        if (speedEl) speedEl.innerText = `${formatBytes(speedBytesSec)}/s`;
 
-        // Calculate speed (bytes per second) since last progress tick
-        const timeDiff = (currentTime - lastTime) / 1000; // in seconds
-        if (timeDiff >= 0.2) { // update speed details every 200ms for visual sanity
-          const loadedDiff = event.loaded - lastLoaded;
-          const speedBytesSec = loadedDiff / timeDiff;
-          
-          document.getElementById(`${uploadId}_speed`).innerText = `${formatBytes(speedBytesSec)}/s`;
-
-          // Calculate ETA
-          const remainingBytes = event.total - event.loaded;
-          const etaSecs = remainingBytes / speedBytesSec;
-          
+        // Calculate ETA
+        const remainingBytes = event.total - event.loaded;
+        const etaSecs = remainingBytes / speedBytesSec;
+        
+        const etaEl = document.getElementById(`${uploadId}_eta`);
+        if (etaEl) {
           if (etaSecs === Infinity || isNaN(etaSecs)) {
-            document.getElementById(`${uploadId}_eta`).innerText = 'Estimating...';
+            etaEl.innerText = 'Estimating...';
           } else if (etaSecs < 1) {
-            document.getElementById(`${uploadId}_eta`).innerText = 'Finishing...';
+            etaEl.innerText = 'Finishing...';
           } else {
             const mins = Math.floor(etaSecs / 60);
             const secs = Math.floor(etaSecs % 60);
-            document.getElementById(`${uploadId}_eta`).innerText = mins > 0 ? `${mins}m ${secs}s left` : `${secs}s left`;
+            etaEl.innerText = mins > 0 ? `${mins}m ${secs}s left` : `${secs}s left`;
           }
-
-          lastTime = currentTime;
-          lastLoaded = event.loaded;
         }
+
+        lastTime = currentTime;
+        lastLoaded = event.loaded;
       }
-    };
+    }
+  };
 
-    // Load complete handler
-    xhr.onload = () => {
-      state.activeUploads.delete(file.name);
-      uploadItem.remove();
-      checkActiveUploadsSection();
+  // Load complete handler
+  xhr.onload = () => {
+    // Check if the item was already canceled/removed
+    if (!state.uploadQueue.includes(item)) return;
 
-      if (xhr.status === 200) {
-        showToast(`'${file.name}' transferred successfully!`, 'success');
-        loadFiles(false); // Silently reload
-      } else {
+    // Clean up item from active lists and maps
+    state.activeUploads.delete(file.name);
+    state.uploadQueue = state.uploadQueue.filter(qItem => qItem.id !== uploadId);
+    
+    const cardEl = document.getElementById(uploadId);
+    if (cardEl) cardEl.remove();
+
+    checkActiveUploadsSection();
+
+    if (xhr.status === 200) {
+      showToast(`'${file.name}' transferred successfully!`, 'success');
+      loadFiles(false); // Silently reload
+    } else {
+      let errorMsg = 'Server error';
+      try {
         const responseData = JSON.parse(xhr.responseText || '{}');
-        showToast(`Failed to upload ${file.name}: ${responseData.error || 'Server error'}`, 'error');
-      }
-    };
+        errorMsg = responseData.error || errorMsg;
+      } catch (e) {}
+      showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error');
+    }
 
-    // Error handler
-    xhr.onerror = () => {
-      state.activeUploads.delete(file.name);
-      uploadItem.remove();
-      checkActiveUploadsSection();
-      showToast(`Network error uploading file '${file.name}'`, 'error');
-    };
+    // Process next in queue
+    processUploadQueue();
+  };
 
-    // Assemble payload
-    const formData = new FormData();
-    formData.append('files', file);
-    formData.append('selfDestruct', isSelfDestruct ? 'true' : 'false');
-    formData.append('selfDestructType', selfDestructType);
-    formData.append('selfDestructValue', selfDestructValue.toString());
-    xhr.send(formData);
-  });
+  // Error handler
+  xhr.onerror = () => {
+    if (!state.uploadQueue.includes(item)) return;
+
+    state.activeUploads.delete(file.name);
+    state.uploadQueue = state.uploadQueue.filter(qItem => qItem.id !== uploadId);
+
+    const cardEl = document.getElementById(uploadId);
+    if (cardEl) cardEl.remove();
+
+    checkActiveUploadsSection();
+    showToast(`Network error uploading file '${file.name}'`, 'error');
+
+    // Process next in queue
+    processUploadQueue();
+  };
+
+  // Assemble payload
+  const formData = new FormData();
+  formData.append('files', file);
+  formData.append('selfDestruct', isSelfDestruct ? 'true' : 'false');
+  formData.append('selfDestructType', selfDestructType);
+  formData.append('selfDestructValue', selfDestructValue.toString());
+  xhr.send(formData);
+}
+
+function cancelUpload(uploadId) {
+  const itemIndex = state.uploadQueue.findIndex(item => item.id === uploadId);
+  if (itemIndex === -1) return;
+
+  const item = state.uploadQueue[itemIndex];
+  
+  // Abort XHR if actively transferring
+  if (item.status === 'uploading' && item.xhr) {
+    item.xhr.abort();
+  }
+
+  // Remove from arrays and DOM
+  state.activeUploads.delete(item.file.name);
+  state.uploadQueue.splice(itemIndex, 1);
+
+  const cardEl = document.getElementById(uploadId);
+  if (cardEl) cardEl.remove();
+
+  showToast(`Upload of '${item.file.name}' was cancelled.`, 'info');
+  checkActiveUploadsSection();
+
+  // Process next queue items since slot might have freed up
+  processUploadQueue();
 }
 
 function renderSelfDestructBadge(file) {
