@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { WebSocketService } from '../services/websocketService';
+import { MetadataService } from '../services/metadataService';
 
 /**
  * Sanitizes a filename to make it safe for server storage and URL downloading.
@@ -29,6 +30,7 @@ export class FileController {
 
   public static setUploadsDir(newPath: string): void {
     FileController._uploadsDir = newPath;
+    process.env.DROPLINK_UPLOADS_DIR = newPath;
     if (!fs.existsSync(newPath)) {
       fs.mkdirSync(newPath, { recursive: true });
     }
@@ -48,16 +50,28 @@ export class FileController {
       const files = fs.readdirSync(uploadsDir);
       const fileList = files
         .map((filename) => {
+          // Ignore hidden files (e.g. .metadata.json, .DS_Store)
+          if (filename.startsWith('.')) {
+            return null;
+          }
+
           const filePath = path.join(uploadsDir, filename);
           if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
             return null;
           }
           
           const stats = fs.statSync(filePath);
+          const meta = MetadataService.getMetadata(filename);
+
           return {
             name: filename,
             size: stats.size, // in bytes
             date: stats.mtime.toISOString(), // upload date
+            selfDestruct: meta?.selfDestruct || false,
+            selfDestructType: meta?.selfDestructType || null,
+            selfDestructValue: meta?.selfDestructValue || null,
+            downloadsLeft: meta?.downloadsLeft ?? null,
+            expiresAt: meta?.expiresAt || null,
           };
         })
         .filter((file) => file !== null);
@@ -81,6 +95,10 @@ export class FileController {
         res.status(400).json({ error: 'No files were uploaded.' });
         return;
       }
+
+      const isSelfDestruct = req.body.selfDestruct === 'true';
+      const selfDestructType = req.body.selfDestructType as 'download' | 'timer';
+      const selfDestructValue = req.body.selfDestructValue ? parseInt(req.body.selfDestructValue, 10) : 0;
 
       const savedNames: string[] = [];
       const uploadsDir = FileController.getUploadsDir();
@@ -114,6 +132,24 @@ export class FileController {
             throw renameError;
           }
         }
+
+        // Save self-destruct metadata if applicable
+        if (isSelfDestruct) {
+          const createdAt = new Date();
+          const expiresAt = selfDestructType === 'timer'
+            ? new Date(createdAt.getTime() + selfDestructValue * 60 * 1000).toISOString()
+            : undefined;
+
+          MetadataService.setMetadata(uniqueName, {
+            selfDestruct: true,
+            selfDestructType,
+            selfDestructValue,
+            downloadsLeft: selfDestructType === 'download' ? 1 : undefined,
+            expiresAt,
+            createdAt: createdAt.toISOString(),
+          });
+        }
+
         savedNames.push(uniqueName);
       }
 
@@ -143,7 +179,35 @@ export class FileController {
         return;
       }
 
-      res.download(filePath, filename);
+      res.download(filePath, filename, (err) => {
+        if (err) {
+          console.error(`[FileController] Error during file download for '${filename}':`, err.message);
+          return;
+        }
+
+        try {
+          const meta = MetadataService.getMetadata(filename);
+          if (meta && meta.selfDestruct && meta.selfDestructType === 'download') {
+            const left = (meta.downloadsLeft !== undefined ? meta.downloadsLeft : 1) - 1;
+            if (left <= 0) {
+              console.log(`[FileController] File '${filename}' download-limit reached. Self-destructing...`);
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+              }
+              MetadataService.deleteMetadata(filename);
+              WebSocketService.broadcast('file_update', { action: 'delete', file: filename });
+            } else {
+              MetadataService.setMetadata(filename, {
+                ...meta,
+                downloadsLeft: left,
+              });
+              WebSocketService.broadcast('file_update', { action: 'upload', files: [filename] });
+            }
+          }
+        } catch (metaError: any) {
+          console.error(`[FileController] Self-destruct download callback error:`, metaError.message);
+        }
+      });
     } catch (error: any) {
       res.status(500).json({ error: 'Failed to download file: ' + error.message });
     }
@@ -164,6 +228,7 @@ export class FileController {
       }
 
       fs.unlinkSync(filePath);
+      MetadataService.deleteMetadata(filename);
 
       // Broadcast socket update
       WebSocketService.broadcast('file_update', { action: 'delete', file: filename });
