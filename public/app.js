@@ -119,7 +119,7 @@ function getFileCategory(filename) {
     audio: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'],
     document: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf'],
     archive: ['zip', 'rar', 'tar', 'gz', '7z', 'bz2'],
-    code: ['html', 'css', 'js', 'ts', 'json', 'py', 'java', 'cpp', 'c', 'sh', 'xml', 'md']
+    code: ['html', 'css', 'js', 'ts', 'json', 'py', 'java', 'cpp', 'c', 'sh', 'xml', 'md', 'env', 'gitignore', 'gitconfig', 'license']
   };
   
   for (const [key, extensions] of Object.entries(types)) {
