@@ -1573,3 +1573,41 @@ body {
   0% { transform: scale(1); opacity: 0.95; }
   100% { transform: scale(1.02); opacity: 1; }
 }
+
+/* -------------------------------------------------------------
+ * COMPONENT: CUSTOM PASSWORD PROTECTION STYLES
+ * ------------------------------------------------------------- */
+#password-setup-panel {
+  transition: var(--transition-smooth);
+}
+
+#password-input {
+  transition: var(--transition-smooth);
+  color: #fff !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.88rem !important;
+  letter-spacing: 0.5px !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+#password-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2) !important;
+}
+
+#password-input::placeholder {
+  color: var(--text-muted) !important;
+  font-size: 0.82rem !important;
+  font-family: var(--font-sans) !important;
+}
+
+/* Dynamic styling for Security Access token box depending on custom password */
+#token-input {
+  transition: var(--transition-smooth);
+}
+
+#token-input::placeholder {
+  letter-spacing: 0 !important;
+}
+

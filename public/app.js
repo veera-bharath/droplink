@@ -14,7 +14,8 @@ const state = {
   activeUploads: new Map(), // Tracks ongoing uploads by file name
   uploadQueue: [], // Tracks items in the upload queue
   uploadsDir: '',
-  myUploads: new Set() // Tracks files uploaded by this specific client tab to prevent self-notification
+  myUploads: new Set(), // Tracks files uploaded by this specific client tab to prevent self-notification
+  isPasswordSet: false
 };
 
 const MAX_CONCURRENT_UPLOADS = 2;
@@ -42,6 +43,13 @@ const DOM = {
   activeFolderPathContainer: document.querySelector('#active-folder-path-container'),
   activeFolderPath: document.querySelector('#active-folder-path'),
   notificationAlertsToggle: document.querySelector('#notification-alerts-toggle'),
+
+  // Password Configuration Elements
+  passwordProtectionToggle: document.querySelector('#password-protection-toggle'),
+  passwordSetupPanel: document.querySelector('#password-setup-panel'),
+  passwordInput: document.querySelector('#password-input'),
+  btnSavePassword: document.querySelector('#btn-save-password'),
+  tokenDescText: document.querySelector('#token-desc-text'),
   
   // Lightbox Selectors
   lightboxOverlay: document.querySelector('#preview-lightbox'),
@@ -214,6 +222,7 @@ async function initApp() {
 
     // 2. Token extraction & login resolution
     let activeToken = '';
+    state.isPasswordSet = !!config.isPasswordSet;
 
     // A: Localhost auto-auth
     if (config.token) {
@@ -239,8 +248,13 @@ async function initApp() {
           activeToken = storedToken;
           showTokenStatus('Restored previous key.', 'success');
         } else {
-          showTokenStatus('Please enter security token.', 'error');
-          showToast('Security token required to download or upload.', 'error');
+          if (state.isPasswordSet) {
+            showTokenStatus('Enter password to access files.', 'error');
+            showToast('Security password required to download or upload.', 'error');
+          } else {
+            showTokenStatus('Please enter security token.', 'error');
+            showToast('Security token required to download or upload.', 'error');
+          }
         }
       }
     }
@@ -248,6 +262,33 @@ async function initApp() {
     if (activeToken) {
       state.token = activeToken;
       DOM.tokenInput.value = activeToken;
+    }
+
+    // Configure password setup display and details dynamically
+    if (DOM.passwordProtectionToggle && DOM.passwordSetupPanel) {
+      DOM.passwordProtectionToggle.checked = state.isPasswordSet;
+      DOM.passwordSetupPanel.style.display = state.isPasswordSet ? 'flex' : 'none';
+      if (state.isPasswordSet) {
+        DOM.passwordInput.placeholder = '••••••••';
+      } else {
+        DOM.passwordInput.placeholder = 'Min 4 characters';
+      }
+    }
+
+    if (state.isPasswordSet) {
+      if (DOM.tokenDescText) {
+        DOM.tokenDescText.innerText = 'This server is password-protected. Enter the custom password or the token shown on the host computer to access files.';
+      }
+      if (DOM.tokenInput) {
+        DOM.tokenInput.placeholder = 'ENTER PASSWORD OR TOKEN';
+      }
+    } else {
+      if (DOM.tokenDescText) {
+        DOM.tokenDescText.innerText = 'This server is protected. Enter the token shown on the host computer to access files.';
+      }
+      if (DOM.tokenInput) {
+        DOM.tokenInput.placeholder = 'ENTER 6-DIGIT TOKEN';
+      }
     }
 
     // 3. Initialize notification preferences state
@@ -923,18 +964,18 @@ function registerEvents() {
     });
   }
 
-  // Save/Apply Token Manual Entry
+  // Save/Apply Token Manual Entry (support case-sensitive custom passwords or uppercase session tokens)
   DOM.btnSaveToken.addEventListener('click', () => {
-    const tokenVal = DOM.tokenInput.value.trim().toUpperCase();
-    if (!tokenVal) {
-      showToast('Token cannot be blank.', 'error');
+    const rawVal = DOM.tokenInput.value.trim();
+    if (!rawVal) {
+      showToast('Credentials cannot be blank.', 'error');
       return;
     }
-    state.token = tokenVal;
-    localStorage.setItem('droplink_token', tokenVal);
+    state.token = rawVal;
+    localStorage.setItem('droplink_token', rawVal);
     
-    showTokenStatus('Token applied manually.', 'success');
-    showToast('Security token saved and applied!', 'success');
+    showTokenStatus('Credentials applied.', 'success');
+    showToast('Credentials saved and applied!', 'success');
     
     // Re-verify files and sockets
     connectWebSocket();
@@ -947,6 +988,39 @@ function registerEvents() {
       DOM.btnSaveToken.click();
     }
   });
+
+  // Password Protection Toggle handler
+  if (DOM.passwordProtectionToggle && DOM.passwordSetupPanel) {
+    DOM.passwordProtectionToggle.addEventListener('change', () => {
+      const isChecked = DOM.passwordProtectionToggle.checked;
+      DOM.passwordSetupPanel.style.display = isChecked ? 'flex' : 'none';
+      if (!isChecked) {
+        // Disable custom password
+        savePassword(null);
+      } else {
+        DOM.passwordInput.value = '';
+        DOM.passwordInput.focus();
+      }
+    });
+  }
+
+  // Custom Password Save Button
+  if (DOM.btnSavePassword && DOM.passwordInput) {
+    DOM.btnSavePassword.addEventListener('click', () => {
+      const password = DOM.passwordInput.value.trim();
+      if (password.length < 4) {
+        showToast('Password must be at least 4 characters long.', 'error');
+        return;
+      }
+      savePassword(password);
+    });
+
+    DOM.passwordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        DOM.btnSavePassword.click();
+      }
+    });
+  }
 
   // Copy Link to Clipboard
   DOM.btnCopyUrl.addEventListener('click', () => {
@@ -1153,6 +1227,64 @@ function closePreview() {
     DOM.lightboxOverlay.style.display = 'none';
     DOM.lightboxBody.innerHTML = '';
   }, 300);
+}
+
+// -------------------------------------------------------------
+// PASSWORD PROTECTION PERSISTENCE CLIENT HELPER
+// -------------------------------------------------------------
+async function savePassword(password) {
+  try {
+    const response = await fetch('/password-config/set', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Token': state.token
+      },
+      body: JSON.stringify({ password })
+    });
+
+    if (response.status === 401) {
+      showToast('Unauthorized: You do not have permissions to modify server settings.', 'error');
+      // Revert UI toggle state
+      if (DOM.passwordProtectionToggle) {
+        DOM.passwordProtectionToggle.checked = state.isPasswordSet;
+        DOM.passwordSetupPanel.style.display = state.isPasswordSet ? 'flex' : 'none';
+      }
+      return;
+    }
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update custom password.');
+    }
+
+    state.isPasswordSet = (password !== null);
+    showToast(data.message, 'success');
+
+    if (password) {
+      DOM.passwordInput.placeholder = '••••••••';
+      DOM.passwordInput.value = '';
+      
+      // Update our client session token to use the custom password
+      state.token = password;
+      localStorage.setItem('droplink_token', password);
+      
+      // Refresh the application configuration to dynamically update Connection URLs and QR Codes
+      initApp();
+    } else {
+      DOM.passwordInput.placeholder = 'Min 4 characters';
+      DOM.passwordInput.value = '';
+
+      // Re-run application initialization to fetch new dynamic token
+      initApp();
+    }
+  } catch (error) {
+    showToast(error.message, 'error');
+    if (DOM.passwordProtectionToggle) {
+      DOM.passwordProtectionToggle.checked = state.isPasswordSet;
+      DOM.passwordSetupPanel.style.display = state.isPasswordSet ? 'flex' : 'none';
+    }
+  }
 }
 
 // -------------------------------------------------------------
