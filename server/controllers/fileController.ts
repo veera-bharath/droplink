@@ -4,18 +4,22 @@ import path from 'path';
 import { WebSocketService } from '../services/websocketService';
 import { MetadataService } from '../services/metadataService';
 
+// Extensions browsers render as active content — served as text/plain in previewFile
+const ACTIVE_CONTENT_EXTS = new Set(['.html', '.htm', '.svg', '.xhtml', '.xml', '.mhtml', '.mht']);
+
 /**
  * Sanitizes a filename to make it safe for server storage and URL downloading.
  * It filters out risky path traversal sequences and replaces whitespace with underscores.
  */
 export function sanitizeFilename(filename: string): string {
-  const ext = path.extname(filename);
-  const base = path.basename(filename, ext);
+  const rawExt = path.extname(filename);
+  const base = path.basename(filename, rawExt);
   const safeBase = base
     .replace(/[^a-zA-Z0-9.\-_ ]/g, '')
     .trim()
     .replace(/\s+/g, '_');
-  return `${safeBase}${ext}`;
+  const safeExt = rawExt.replace(/[^a-zA-Z0-9.]/g, '');
+  return `${safeBase}${safeExt}`;
 }
 
 export class FileController {
@@ -253,7 +257,23 @@ export class FileController {
         return;
       }
 
-      res.sendFile(filePath);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+
+      const ext = path.extname(filename).toLowerCase();
+      if (ACTIVE_CONTENT_EXTS.has(ext)) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', (err) => {
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to serve preview: ' + err.message });
+          } else {
+            res.destroy();
+          }
+        });
+        stream.pipe(res);
+      } else {
+        res.sendFile(filePath);
+      }
     } catch (error: any) {
       res.status(500).json({ error: 'Failed to serve preview: ' + error.message });
     }
