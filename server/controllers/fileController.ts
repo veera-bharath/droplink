@@ -183,33 +183,44 @@ export class FileController {
         return;
       }
 
+      // Decrement the download counter synchronously before starting the transfer.
+      // Doing this before res.download() prevents concurrent requests from both
+      // reading downloadsLeft > 0 and both succeeding.
+      let shouldDeleteAfter = false;
+      const meta = MetadataService.getMetadata(filename);
+      if (meta && meta.selfDestruct && meta.selfDestructType === 'download') {
+        const left = (meta.downloadsLeft !== undefined ? meta.downloadsLeft : 1) - 1;
+        if (left < 0) {
+          res.status(410).json({ error: 'File download limit has been reached.' });
+          return;
+        }
+        if (left === 0) {
+          shouldDeleteAfter = true;
+          // Write 0 immediately so any concurrent request in-flight sees the limit
+          MetadataService.setMetadata(filename, { ...meta, downloadsLeft: 0 });
+        } else {
+          MetadataService.setMetadata(filename, { ...meta, downloadsLeft: left });
+          WebSocketService.broadcast('file_update', { action: 'upload', files: [filename] });
+        }
+      }
+
       res.download(filePath, filename, (err) => {
         if (err) {
           console.error(`[FileController] Error during file download for '${filename}':`, err.message);
           return;
         }
 
-        try {
-          const meta = MetadataService.getMetadata(filename);
-          if (meta && meta.selfDestruct && meta.selfDestructType === 'download') {
-            const left = (meta.downloadsLeft !== undefined ? meta.downloadsLeft : 1) - 1;
-            if (left <= 0) {
-              console.log(`[FileController] File '${filename}' download-limit reached. Self-destructing...`);
-              if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-              }
-              MetadataService.deleteMetadata(filename);
-              WebSocketService.broadcast('file_update', { action: 'delete', file: filename });
-            } else {
-              MetadataService.setMetadata(filename, {
-                ...meta,
-                downloadsLeft: left,
-              });
-              WebSocketService.broadcast('file_update', { action: 'upload', files: [filename] });
+        if (shouldDeleteAfter) {
+          try {
+            console.log(`[FileController] File '${filename}' download-limit reached. Self-destructing...`);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
             }
+            MetadataService.deleteMetadata(filename);
+            WebSocketService.broadcast('file_update', { action: 'delete', file: filename });
+          } catch (deleteError: any) {
+            console.error(`[FileController] Self-destruct delete error:`, deleteError.message);
           }
-        } catch (metaError: any) {
-          console.error(`[FileController] Self-destruct download callback error:`, metaError.message);
         }
       });
     } catch (error: any) {
