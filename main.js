@@ -440,6 +440,8 @@ function pingServerAndLoadUI(retries = 30) {
         </html>
       `)}`);
       mainWindow.show();
+      // Clear any buffered shell files — the app failed to start so uploads are impossible
+      pendingShellFiles = [];
     }
     return;
   }
@@ -554,8 +556,12 @@ ipcMain.on('show-notification', (event, { title, body }) => {
 // IPC handler that reads a local file from disk and returns its content to the renderer.
 // Used by the shell context menu flow to convert absolute paths into uploadable File objects.
 ipcMain.handle('read-file-for-upload', async (event, filePath) => {
-  const buffer = await fs.promises.readFile(filePath);
   const stat = await fs.promises.stat(filePath);
+  const MAX = 2 * 1024 * 1024 * 1024;
+  if (stat.size > MAX) {
+    throw new Error(`File exceeds the 2 GB upload limit (${(stat.size / 1e9).toFixed(1)} GB).`);
+  }
+  const buffer = await fs.promises.readFile(filePath);
   // Slice to get a standalone ArrayBuffer (Node Buffer may share a pool)
   const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
   return {
