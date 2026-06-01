@@ -299,26 +299,6 @@ async function initApp() {
       } else {
         DOM.notificationAlertsToggle.checked = true; // Enabled by default
       }
-      
-      DOM.notificationAlertsToggle.addEventListener('change', () => {
-        const isChecked = DOM.notificationAlertsToggle.checked;
-        localStorage.setItem('droplink_notifications', isChecked ? 'true' : 'false');
-        
-        if (isChecked && !window.electronAPI) {
-          // If in browser and enabling, request permission
-          if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission().then(permission => {
-              if (permission !== 'granted') {
-                showToast('Notification permission denied.', 'info');
-                DOM.notificationAlertsToggle.checked = false;
-                localStorage.setItem('droplink_notifications', 'false');
-              } else {
-                showToast('Notification alerts enabled.', 'success');
-              }
-            });
-          }
-        }
-      });
     }
 
     // 4. Connect to WebSockets & load files
@@ -954,7 +934,29 @@ async function confirmAndDeleteFile(filename) {
 // EVENT BINDINGS
 // -------------------------------------------------------------
 function registerEvents() {
-  
+
+  // Notification toggle — registered once here to prevent stacking when initApp() reruns
+  if (DOM.notificationAlertsToggle) {
+    DOM.notificationAlertsToggle.addEventListener('change', () => {
+      const isChecked = DOM.notificationAlertsToggle.checked;
+      localStorage.setItem('droplink_notifications', isChecked ? 'true' : 'false');
+
+      if (isChecked && !window.electronAPI) {
+        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission !== 'granted') {
+              showToast('Notification permission denied.', 'info');
+              DOM.notificationAlertsToggle.checked = false;
+              localStorage.setItem('droplink_notifications', 'false');
+            } else {
+              showToast('Notification alerts enabled.', 'success');
+            }
+          });
+        }
+      }
+    });
+  }
+
   // Self-destruct options toggle listener
   const selfDestructToggle = document.querySelector('#self-destruct-toggle');
   const selfDestructSettings = document.querySelector('#self-destruct-settings');
