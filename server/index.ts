@@ -41,15 +41,16 @@ app.get('/config', async (req, res) => {
       req.hostname === 'localhost' ||
       req.hostname === '127.0.0.1';
 
-    const activeToken = TokenService.isPasswordEnabled()
-      ? TokenService.getCustomPassword()
-      : TokenService.getSessionToken();
+    // Always use the session token for the QR / auto-auth URL.
+    // The custom password is a credential remote users type manually — it must never
+    // be embedded in a URL or QR code where it could be captured by cameras or scanner apps.
+    const activeToken = TokenService.getSessionToken();
 
+    const baseConnectionUrl = `http://${localIp}:${PORT}`;
     // Token-bearing URL and QR code are only generated for the localhost host UI.
     // External callers receive the bare server address so they can display it,
     // but cannot extract credentials from the response.
-    const tokenConnectionUrl = `http://${localIp}:${PORT}/?token=${activeToken}`;
-    const baseConnectionUrl = `http://${localIp}:${PORT}`;
+    const tokenConnectionUrl = `${baseConnectionUrl}/?token=${activeToken}`;
 
     const qrCodeBase64 = isLocalhost
       ? await QRCode.toDataURL(tokenConnectionUrl)

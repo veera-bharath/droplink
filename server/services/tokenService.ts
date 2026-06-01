@@ -2,26 +2,52 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEYLEN = 64;
+const PBKDF2_DIGEST = 'sha512';
+
 export class TokenService {
   private static sessionToken: string;
+  // Plaintext only while set in the current process — never loaded from disk.
   private static customPassword: string | null = null;
+  // Hash + salt loaded from disk (used for validation after a restart).
+  private static passwordHash: string | null = null;
+  private static passwordSalt: string | null = null;
 
   private static getConfigFile(): string {
     const uploadsDir = process.env.DROPLINK_UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     return path.join(uploadsDir, '.config.json');
   }
 
+  private static deriveHash(password: string, salt: string): string {
+    return crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST).toString('hex');
+  }
+
   /**
    * Loads the custom password configuration from local disk.
+   * Migrates any legacy plaintext entry to a hashed representation on first load.
    */
   public static loadPasswordConfig(): void {
     try {
       const configFile = this.getConfigFile();
-      if (fs.existsSync(configFile)) {
-        const data = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-        if (typeof data.password === 'string') {
-          this.customPassword = data.password;
-        }
+      if (!fs.existsSync(configFile)) return;
+
+      const data = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+
+      if (typeof data.passwordHash === 'string' && typeof data.passwordSalt === 'string') {
+        // Normal path: hash already stored
+        this.passwordHash = data.passwordHash;
+        this.passwordSalt = data.passwordSalt;
+      } else if (typeof data.password === 'string') {
+        // Migration: hash the legacy plaintext and overwrite the file
+        const salt = crypto.randomBytes(32).toString('hex');
+        const hash = this.deriveHash(data.password, salt);
+        this.passwordHash = hash;
+        this.passwordSalt = salt;
+
+        const migrated = { ...data, passwordHash: hash, passwordSalt: salt };
+        delete migrated.password;
+        fs.writeFileSync(configFile, JSON.stringify(migrated, null, 2), 'utf8');
       }
     } catch (err: any) {
       console.error('[TokenService] Failed to load password config:', err.message);
@@ -33,7 +59,6 @@ export class TokenService {
    */
   public static generateSessionToken(): string {
     if (!this.sessionToken) {
-      // 6 characters of uppercase letters/numbers, easy to read and type manually if needed
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let token = '';
       const bytes = crypto.randomBytes(6);
@@ -41,7 +66,7 @@ export class TokenService {
         token += chars[bytes[i] % chars.length];
       }
       this.sessionToken = token;
-      
+
       // Auto-load custom password on token initialization (startup)
       this.loadPasswordConfig();
     }
@@ -59,7 +84,8 @@ export class TokenService {
   }
 
   /**
-   * Retrieves the configured custom password.
+   * Returns the plaintext custom password for the current session, or null if unavailable.
+   * Only set while the password was configured in this process — not populated after a restart.
    */
   public static getCustomPassword(): string | null {
     return this.customPassword;
@@ -67,9 +93,22 @@ export class TokenService {
 
   /**
    * Sets and persists the custom password.
+   * Stores a PBKDF2 hash + random salt on disk; plaintext is kept only in memory.
    */
   public static setCustomPassword(password: string | null): void {
-    this.customPassword = password && password.trim() ? password.trim() : null;
+    const trimmed = password && password.trim() ? password.trim() : null;
+    this.customPassword = trimmed;
+
+    if (trimmed) {
+      const salt = crypto.randomBytes(32).toString('hex');
+      const hash = this.deriveHash(trimmed, salt);
+      this.passwordHash = hash;
+      this.passwordSalt = salt;
+    } else {
+      this.passwordHash = null;
+      this.passwordSalt = null;
+    }
+
     try {
       const configFile = this.getConfigFile();
       const dir = path.dirname(configFile);
@@ -84,10 +123,15 @@ export class TokenService {
         } catch (e) {}
       }
 
-      if (this.customPassword) {
-        configData.password = this.customPassword;
+      // Always remove any legacy plaintext entry
+      delete configData.password;
+
+      if (this.passwordHash && this.passwordSalt) {
+        configData.passwordHash = this.passwordHash;
+        configData.passwordSalt = this.passwordSalt;
       } else {
-        delete configData.password;
+        delete configData.passwordHash;
+        delete configData.passwordSalt;
       }
 
       fs.writeFileSync(configFile, JSON.stringify(configData, null, 2), 'utf8');
@@ -97,33 +141,39 @@ export class TokenService {
   }
 
   /**
-   * Checks if a custom password is set.
+   * Checks if a custom password is configured (either in-memory or as a stored hash).
    */
   public static isPasswordEnabled(): boolean {
-    return this.customPassword !== null;
+    return this.customPassword !== null || this.passwordHash !== null;
   }
 
   /**
-   * Validates if a client-supplied token matches either the session token or the custom password.
+   * Validates a client-supplied token against the session token or the custom password.
    */
   public static validateToken(token?: string | string[]): boolean {
     if (!token) return false;
-    
-    // Support either query strings, headers, or URL params
+
     const tokenStr = Array.isArray(token) ? token[0] : token;
     const cleanToken = tokenStr.trim();
 
-    // 1. Validate against session token (case-insensitive)
+    // 1. Session token (case-insensitive)
     if (cleanToken.toUpperCase() === this.sessionToken.toUpperCase()) {
       return true;
     }
 
-    // 2. Validate against custom password (case-sensitive)
+    // 2. Custom password — plaintext comparison when available in the current session
     if (this.customPassword && cleanToken === this.customPassword) {
       return true;
+    }
+
+    // 3. Hash comparison when only the stored hash is available (e.g. after a restart)
+    if (!this.customPassword && this.passwordHash && this.passwordSalt) {
+      const candidate = this.deriveHash(cleanToken, this.passwordSalt);
+      if (crypto.timingSafeEqual(Buffer.from(candidate, 'hex'), Buffer.from(this.passwordHash, 'hex'))) {
+        return true;
+      }
     }
 
     return false;
   }
 }
-
