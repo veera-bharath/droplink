@@ -41,7 +41,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DropLink",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "include": "installer/context-menu.nsh"
     },
     "publish": {
       "provider": "github",

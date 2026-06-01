@@ -1325,5 +1325,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+
+    // Handle files forwarded from the Windows shell context menu ("Share with DropLink")
+    if (window.electronAPI.onShellFiles) {
+      window.electronAPI.onShellFiles(async (filePaths) => {
+        if (!state.token) {
+          showToast('Cannot upload: please authenticate first.', 'error');
+          return;
+        }
+        const files = [];
+        for (const filePath of filePaths) {
+          try {
+            const { arrayBuffer, name, lastModified, type } = await window.electronAPI.readFileForUpload(filePath);
+            files.push(new File([arrayBuffer], name, { type, lastModified }));
+          } catch (err) {
+            showToast(`Could not read "${filePath.split(/[\\/]/).pop()}": ${err.message}`, 'error');
+          }
+        }
+        if (files.length > 0) {
+          uploadFiles(files);
+        }
+      });
+    }
   }
 });
