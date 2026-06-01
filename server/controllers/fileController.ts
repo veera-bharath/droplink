@@ -60,11 +60,15 @@ export class FileController {
           }
 
           const filePath = path.join(uploadsDir, filename);
-          if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+          let stats: fs.Stats;
+          try {
+            stats = fs.statSync(filePath);
+          } catch {
             return null;
           }
-          
-          const stats = fs.statSync(filePath);
+          if (!stats.isFile()) {
+            return null;
+          }
           const meta = MetadataService.getMetadata(filename);
 
           return {
