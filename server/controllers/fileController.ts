@@ -18,7 +18,7 @@ export function sanitizeFilename(filename: string): string {
     .replace(/[^a-zA-Z0-9.\-_ ]/g, '')
     .trim()
     .replace(/\s+/g, '_');
-  const safeExt = rawExt.replace(/[^a-zA-Z0-9.]/g, '').toLowerCase();
+  const safeExt = rawExt.replace(/[^a-zA-Z0-9.]/g, '');
   return `${safeBase}${safeExt}`;
 }
 
@@ -262,7 +262,15 @@ export class FileController {
       const ext = path.extname(filename).toLowerCase();
       if (ACTIVE_CONTENT_EXTS.has(ext)) {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        fs.createReadStream(filePath).pipe(res);
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', (err) => {
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to serve preview: ' + err.message });
+          } else {
+            res.destroy();
+          }
+        });
+        stream.pipe(res);
       } else {
         res.sendFile(filePath);
       }
