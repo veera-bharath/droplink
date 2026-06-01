@@ -12,8 +12,11 @@ const router = Router();
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     const tempDir = path.join(FileController.getUploadsDir(), 'tmp');
-    if (!fs.existsSync(tempDir)) {
+    try {
       fs.mkdirSync(tempDir, { recursive: true });
+    } catch (err) {
+      cb(err as Error, '');
+      return;
     }
     cb(null, tempDir);
   },
