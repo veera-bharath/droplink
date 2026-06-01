@@ -7,18 +7,23 @@ import { TokenService } from '../services/tokenService';
 
 const router = Router();
 
-// Setup Multer for handling multipart/form-data uploads
-// Resolve a writeable physical temp directory outside ASAR
-const uploadDir = process.env.DROPLINK_UPLOADS_DIR || path.join(process.cwd(), 'uploads');
-const tempDir = path.join(uploadDir, 'tmp');
-
-// Ensure the temp directory exists
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir, { recursive: true });
-}
+// Multer storage that resolves tempDir at request time so runtime save-directory
+// changes (via Electron directory picker) are always reflected.
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const tempDir = path.join(FileController.getUploadsDir(), 'tmp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
+  },
+  filename: (_req, file, cb) => {
+    cb(null, file.fieldname + '-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  },
+});
 
 const upload = multer({
-  dest: tempDir,
+  storage,
   limits: {
     fileSize: 2 * 1024 * 1024 * 1024, // 2GB file size limit
   },
