@@ -16,6 +16,7 @@ DropLink is a modern, high-performance, and beautifully styled local network fil
 
 - **🚀 Native Desktop App Shell**: Wrapped in a modern, borderless Electron wrapper for a native Windows software feel.
 - **🛡️ Double-Ended Session Security**: Auto-generates a secure, 6-character uppercase security token upon launch. Direct scans of the QR code pre-authenticate mobile devices instantly. 
+- **🔑 Persistent Password Protection**: Set a persistent security password in the Preferences panel. Scans of the QR code dynamically encode the password for frictionless connection, while manual connections can use either the active 6-character session token or your custom password.
 - **💻 Host Auto-Login**: The app automatically logs you in when opened on `127.0.0.1` (the hosting PC), but requires verification for external local Wi-Fi clients.
 - **📂 Native Windows Downloads Directory**: Uploaded files automatically stream directly into your local `C:\Users\<Name>\Downloads\DropLink` directory rather than hiding in temporary app caches.
 - **🔌 EXDEV Multi-Drive Fallback**: Robust, enterprise-grade handling for cross-device filesystem moves. If your project is hosted on a secondary partition (e.g. `D:\`), uploads are cleanly copied and unlinked across volumes onto your primary `C:\` drive Downloads folder.
@@ -113,7 +114,7 @@ If you prefer to run DropLink as a lightweight command-line tool or host it in a
 
 ## 🛡️ Security Model
 1. **Network Boundary**: DropLink only binds to your local LAN network adapter (e.g. `192.168.1.x`) and `127.0.0.1`. It does not listen to public ports or wide-area connections.
-2. **Key Verification**: All critical endpoints (`/files`, `/upload`, `/file/*`, `/download/*`) require the active 6-character session token. This token must be passed in the `X-Session-Token` header or `?token=...` query string.
+2. **Key Verification**: All critical endpoints (`/files`, `/upload`, `/file/*`, `/download/*`) require either the active 6-character dynamic session token or your custom configured persistent password. This credential must be passed in the `X-Session-Token` header or `?token=...` query string.
 3. **Localhost Exemption**: Requests originating from `localhost` or `127.0.0.1` are automatically authorized to fetch the token inside `/config` so the hosting PC user has zero-typing frictionless access.
 4. **Isolate Renderers**: Electron window context isolation is enabled, ensuring web pages cannot execute direct arbitrary Node.js scripts on your desktop.
 
