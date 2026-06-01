@@ -65,9 +65,9 @@
             </h3>
           </div>
           <div class="card-body">
-            <p class="desc-text" id="token-desc-text">This server is protected. Enter the password or the token shown on the host computer to access files.</p>
+            <p class="desc-text">This server is protected. Enter the token shown on the host computer to access files.</p>
             <div class="token-input-wrapper">
-              <input type="text" id="token-input" placeholder="ENTER PASSWORD OR TOKEN" maxlength="32" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+              <input type="text" id="token-input" placeholder="ENTER 6-DIGIT TOKEN" maxlength="8" autocomplete="off">
               <button id="btn-save-token" class="btn btn-primary">
                 <span>Apply</span>
               </button>
@@ -110,62 +110,6 @@
             </div>
           </div>
         </div>
-
-        <!-- PREFERENCES & SETTINGS -->
-        <div class="card glass shadow-lg preferences-card" style="margin-top: 1.5rem;">
-          <div class="card-header">
-            <h3>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="header-icon">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-              <span>Preferences</span>
-            </h3>
-          </div>
-          <div class="card-body">
-            <p class="desc-text">Manage your local device settings and visual transfer preferences.</p>
-            <div class="preferences-options" style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
-              <div class="option-row">
-                <label class="toggle-control">
-                  <input type="checkbox" id="notification-alerts-toggle" checked>
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text" style="display: inline-flex; align-items: center; gap: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
-                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                    </svg>
-                    <span>Desktop & Browser Alerts</span>
-                  </span>
-                </label>
-              </div>
-
-              <!-- Password Protection Option -->
-              <div class="option-row" style="border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 12px;">
-                <label class="toggle-control">
-                  <input type="checkbox" id="password-protection-toggle">
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text" style="display: inline-flex; align-items: center; gap: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    <span>Custom Password Access</span>
-                  </span>
-                </label>
-              </div>
-
-              <!-- Password Setup Form Panel -->
-              <div id="password-setup-panel" style="display: none; margin-top: 4px; padding-left: 52px; flex-direction: column; gap: 8px;">
-                <div class="connection-details">
-                  <div class="copy-url-wrapper" style="gap: 8px;">
-                    <input type="password" id="password-input" placeholder="Min 4 characters" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="font-family: var(--font-sans); letter-spacing: 0; background: rgba(0, 0, 0, 0.3);">
-                    <button id="btn-save-password" class="btn btn-primary" style="padding: 10px 14px; font-size: 0.8rem;">Save</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <!-- RIGHT COLUMN: DROPZONE & TRANSFERRED FILES -->
@@ -200,34 +144,6 @@
               </div>
             </div>
 
-            <!-- Upload Custom Options (Self-Destruct) -->
-            <div class="upload-options-container">
-              <div class="option-row">
-                <label class="toggle-control">
-                  <input type="checkbox" id="self-destruct-toggle">
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text" style="display: inline-flex; align-items: center; gap: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--danger);">
-                      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-                    </svg>
-                    <span>Self-Destruct on Expiration</span>
-                  </span>
-                </label>
-              </div>
-              <div class="option-settings-panel" id="self-destruct-settings" style="display: none;">
-                <div class="select-wrapper">
-                  <label for="self-destruct-type">Destruction Rule</label>
-                  <select id="self-destruct-type">
-                    <option value="download">Delete after 1 download</option>
-                    <option value="timer_1">Delete after 1 minute</option>
-                    <option value="timer_5">Delete after 5 minutes</option>
-                    <option value="timer_15">Delete after 15 minutes</option>
-                    <option value="timer_60">Delete after 1 hour</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
             <!-- Active Uploads List -->
             <div class="active-uploads-container" id="active-uploads-section" style="display: none;">
               <h4>Active Uploads</h4>
@@ -256,13 +172,6 @@
                   </svg>
                   <span>Open Folder</span>
                 </button>
-                <button id="btn-change-downloads" class="btn btn-secondary" style="display: none; padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; gap: 4px;">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                  <span>Change Folder</span>
-                </button>
               </div>
             </div>
             <div class="search-wrapper">
@@ -272,14 +181,6 @@
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
             </div>
-          </div>
-          
-          <div id="active-folder-path-container" class="folder-path-strip" style="display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-            <span style="font-weight: 500;">Saving to:</span>
-            <span id="active-folder-path" style="font-family: 'Fira Code', monospace; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis;">-</span>
           </div>
 
           <div class="card-body scrollable-body">
@@ -306,44 +207,6 @@
 
   <!-- TOAST ALERTS CONTAINER -->
   <div class="toast-container" id="toast-container"></div>
-
-  <!-- INLINE MEDIA PREVIEW LIGHTBOX -->
-  <div id="preview-lightbox" class="lightbox-overlay" style="display: none;">
-    <div class="lightbox-backdrop"></div>
-    <div class="lightbox-container glass">
-      <!-- Lightbox Header -->
-      <div class="lightbox-header">
-        <div class="lightbox-title-block">
-          <div class="lightbox-icon" id="lightbox-icon"></div>
-          <span class="lightbox-filename" id="lightbox-filename">Filename.png</span>
-        </div>
-        <div class="lightbox-actions">
-          <button id="btn-lightbox-download" class="btn btn-secondary action-btn" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; gap: 4px;" title="Download">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            <span>Download</span>
-          </button>
-          <button id="btn-lightbox-delete" class="btn btn-secondary action-btn" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; gap: 4px; border-color: rgba(239, 68, 68, 0.2); color: #ef4444;" title="Delete">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-            </svg>
-            <span>Delete</span>
-          </button>
-          <button id="btn-lightbox-close" class="lightbox-close-btn" title="Close (Esc)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Lightbox Body (Content Area) -->
-      <div class="lightbox-body" id="lightbox-body">
-        <!-- Content will be injected dynamically -->
-      </div>
-    </div>
-  </div>
 
   <!-- Client Script -->
   <script src="app.js"></script>
