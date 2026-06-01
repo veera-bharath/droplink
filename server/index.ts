@@ -48,16 +48,23 @@ app.get('/config', async (req, res) => {
       ? TokenService.getCustomPassword()
       : TokenService.getSessionToken();
 
-    const connectionUrl = `http://${localIp}:${PORT}/?token=${activeToken}`;
-    const qrCodeBase64 = await QRCode.toDataURL(connectionUrl);
+    // Token-bearing URL and QR code are only generated for the localhost host UI.
+    // External callers receive the bare server address so they can display it,
+    // but cannot extract credentials from the response.
+    const tokenConnectionUrl = `http://${localIp}:${PORT}/?token=${activeToken}`;
+    const baseConnectionUrl = `http://${localIp}:${PORT}`;
+
+    const qrCodeBase64 = isLocalhost
+      ? await QRCode.toDataURL(tokenConnectionUrl)
+      : null;
 
     res.json({
       ip: localIp,
       port: PORT,
-      token: isLocalhost ? activeToken : null, // Securely hide from external Wi-Fi scanners
-      connectionUrl,
+      token: isLocalhost ? activeToken : null,
+      connectionUrl: isLocalhost ? tokenConnectionUrl : baseConnectionUrl,
       qrCode: qrCodeBase64,
-      uploadsDir: FileController.getUploadsDir(),
+      uploadsDir: isLocalhost ? FileController.getUploadsDir() : null,
       isPasswordSet: TokenService.isPasswordEnabled(),
     });
   } catch (error: any) {
