@@ -185,28 +185,34 @@ export class FileController {
 
       // Decrement the download counter synchronously before starting the transfer.
       // Doing this before res.download() prevents concurrent requests from both
-      // reading downloadsLeft > 0 and both succeeding.
+      // reading downloadsLeft > 0 and both succeeding. On transfer error the
+      // counter is restored so a failed delivery doesn't permanently brick the file.
       let shouldDeleteAfter = false;
+      let decremented = false;
       const meta = MetadataService.getMetadata(filename);
       if (meta && meta.selfDestruct && meta.selfDestructType === 'download') {
-        const left = (meta.downloadsLeft !== undefined ? meta.downloadsLeft : 1) - 1;
+        const currentLeft = meta.downloadsLeft !== undefined ? meta.downloadsLeft : 1;
+        const left = currentLeft - 1;
         if (left < 0) {
           res.status(410).json({ error: 'File download limit has been reached.' });
           return;
         }
+        decremented = true;
         if (left === 0) {
           shouldDeleteAfter = true;
-          // Write 0 immediately so any concurrent request in-flight sees the limit
           MetadataService.setMetadata(filename, { ...meta, downloadsLeft: 0 });
         } else {
           MetadataService.setMetadata(filename, { ...meta, downloadsLeft: left });
-          WebSocketService.broadcast('file_update', { action: 'upload', files: [filename] });
         }
       }
 
       res.download(filePath, filename, (err) => {
         if (err) {
           console.error(`[FileController] Error during file download for '${filename}':`, err.message);
+          // Restore counter so the file remains downloadable after a failed transfer
+          if (decremented && meta) {
+            MetadataService.setMetadata(filename, meta);
+          }
           return;
         }
 
@@ -221,6 +227,8 @@ export class FileController {
           } catch (deleteError: any) {
             console.error(`[FileController] Self-destruct delete error:`, deleteError.message);
           }
+        } else if (decremented) {
+          WebSocketService.broadcast('file_update', { action: 'upload', files: [filename] });
         }
       });
     } catch (error: any) {
