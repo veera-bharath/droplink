@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import http from 'http';
 import QRCode from 'qrcode';
@@ -13,8 +12,6 @@ import { MetadataService } from './services/metadataService';
 const app = express();
 const PORT = 3000;
 
-// Enable CORS for easy mobile-to-PC resource access
-app.use(cors());
 app.use(express.json());
 
 // Resolve static assets from the path provided by the Electron main process.
