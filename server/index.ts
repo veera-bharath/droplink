@@ -41,10 +41,10 @@ app.get('/config', async (req, res) => {
       req.hostname === 'localhost' ||
       req.hostname === '127.0.0.1';
 
-    // When a custom password is set but the server was restarted, getCustomPassword()
-    // returns null (plaintext is never persisted to disk). Fall back to the session token
-    // so the local Electron window can still auto-authenticate via the QR URL.
-    const activeToken = TokenService.getCustomPassword() ?? TokenService.getSessionToken();
+    // Always use the session token for the QR / auto-auth URL.
+    // The custom password is a credential remote users type manually — it must never
+    // be embedded in a URL or QR code where it could be captured by cameras or scanner apps.
+    const activeToken = TokenService.getSessionToken();
 
     const baseConnectionUrl = `http://${localIp}:${PORT}`;
     // Token-bearing URL and QR code are only generated for the localhost host UI.
