@@ -49,6 +49,8 @@ const DOM = {
   passwordSetupPanel: document.querySelector('#password-setup-panel'),
   passwordInput: document.querySelector('#password-input'),
   btnSavePassword: document.querySelector('#btn-save-password'),
+  passwordSaveStatus: document.querySelector('#password-save-status'),
+  passwordPersistentHint: document.querySelector('#password-persistent-hint'),
   tokenDescText: document.querySelector('#token-desc-text'),
   
   // Lightbox Selectors
@@ -272,6 +274,15 @@ async function initApp() {
         DOM.passwordInput.placeholder = '••••••••';
       } else {
         DOM.passwordInput.placeholder = 'Min 4 characters';
+      }
+      if (DOM.btnSavePassword) {
+        DOM.btnSavePassword.textContent = state.isPasswordSet ? 'Update' : 'Save';
+      }
+      if (DOM.passwordSaveStatus) {
+        DOM.passwordSaveStatus.style.display = 'none';
+      }
+      if (DOM.passwordPersistentHint) {
+        DOM.passwordPersistentHint.style.display = state.isPasswordSet ? 'block' : 'none';
       }
     }
 
@@ -998,10 +1009,15 @@ function registerEvents() {
       DOM.passwordSetupPanel.style.display = isChecked ? 'flex' : 'none';
       if (!isChecked) {
         // Disable custom password
+        if (DOM.passwordSaveStatus) DOM.passwordSaveStatus.style.display = 'none';
         savePassword(null);
       } else {
         DOM.passwordInput.value = '';
         DOM.passwordInput.focus();
+        // Show "not saved" indicator only when enabling fresh (no existing password)
+        if (DOM.passwordSaveStatus && !state.isPasswordSet) {
+          DOM.passwordSaveStatus.style.display = 'block';
+        }
       }
     });
   }
@@ -1263,23 +1279,8 @@ async function savePassword(password) {
     state.isPasswordSet = (password !== null);
     showToast(data.message, 'success');
 
-    if (password) {
-      DOM.passwordInput.placeholder = '••••••••';
-      DOM.passwordInput.value = '';
-      
-      // Update our client session token to use the custom password
-      state.token = password;
-      localStorage.setItem('droplink_token', password);
-      
-      // Refresh the application configuration to dynamically update Connection URLs and QR Codes
-      initApp();
-    } else {
-      DOM.passwordInput.placeholder = 'Min 4 characters';
-      DOM.passwordInput.value = '';
-
-      // Re-run application initialization to fetch new dynamic token
-      initApp();
-    }
+    DOM.passwordInput.value = '';
+    initApp();
   } catch (error) {
     showToast(error.message, 'error');
     if (DOM.passwordProtectionToggle) {
