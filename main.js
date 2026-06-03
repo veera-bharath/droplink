@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, dialog, Notification } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -9,15 +9,44 @@ let mainWindow = null;
 let splashWindow = null;
 let tray = null;
 let isQuitting = false;
+let pendingShellFiles = [];
+let mainWindowReady = false;
 const appIconPath = process.platform === 'win32'
   ? path.join(__dirname, 'assets', 'icon.ico')
   : path.join(__dirname, 'assets', 'icon.png');
 const trayIconPath = path.join(__dirname, 'assets', 'icon-tray.png');
 
 // Dynamic uploads folder in user's system Downloads folder
-const uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
+let uploadsDir = path.join(app.getPath('downloads'), 'DropLink');
 // Dynamic log path in user AppData folder
 const logPath = path.join(app.getPath('userData'), 'server.log');
+
+/**
+ * Extracts valid file paths from a process argv array, skipping flags and non-files.
+ */
+function getShellFilePaths(argv) {
+  const startIdx = app.isPackaged ? 1 : 2;
+  return argv.slice(startIdx).filter(arg => {
+    if (arg.startsWith('-')) return false;
+    try {
+      return fs.statSync(arg).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Sends file paths to the renderer. Buffers them if the window is not ready yet.
+ */
+function sendShellFilesToRenderer(filePaths) {
+  if (!filePaths.length) return;
+  if (mainWindowReady && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('shell-files', filePaths);
+  } else {
+    pendingShellFiles.push(...filePaths);
+  }
+}
 
 /**
  * Spawns the background TypeScript-compiled Node.js Express server.
@@ -275,6 +304,11 @@ function createMainWindow() {
     }
     mainWindow.show();
     mainWindow.focus();
+    mainWindowReady = true;
+    if (pendingShellFiles.length > 0) {
+      mainWindow.webContents.send('shell-files', pendingShellFiles);
+      pendingShellFiles = [];
+    }
   });
 
   // Minimize to System Tray when close is clicked instead of closing the background server
@@ -406,6 +440,8 @@ function pingServerAndLoadUI(retries = 30) {
         </html>
       `)}`);
       mainWindow.show();
+      // Clear any buffered shell files — the app failed to start so uploads are impossible
+      pendingShellFiles = [];
     }
     return;
   }
@@ -431,20 +467,28 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (event, commandLine) => {
     // Focus existing window if a duplicate app launch is attempted
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
+    // Forward any file paths passed by the shell context menu
+    sendShellFilesToRenderer(getShellFilePaths(commandLine));
   });
 
   app.on('ready', () => {
+    // Capture any file paths passed on the initial launch (context menu when app was closed)
+    const initialFiles = getShellFilePaths(process.argv);
+    if (initialFiles.length > 0) {
+      pendingShellFiles.push(...initialFiles);
+    }
+
     createSplashWindow();
     startBackgroundServer();
     createSystemTray();
-    
+
     // Begin ping checks
     pingServerAndLoadUI();
   });
@@ -458,6 +502,75 @@ ipcMain.on('open-downloads', () => {
     fs.mkdirSync(uploadsDir, { recursive: true });
     shell.openPath(uploadsDir);
   }
+});
+
+// IPC handler to open native directory picker and set custom uploads directory
+ipcMain.handle('select-directory', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Save Directory',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  
+  const selectedPath = result.filePaths[0];
+  uploadsDir = selectedPath;
+  
+  // Ensure the new directory exists
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  // Notify background Express server process
+  if (serverProcess && serverProcess.connected) {
+    serverProcess.send({ type: 'SET_UPLOADS_DIR', path: uploadsDir });
+  }
+
+  return uploadsDir;
+});
+
+// IPC listener for triggering native OS desktop notifications
+ipcMain.on('show-notification', (event, { title, body }) => {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: title,
+      body: body,
+      icon: appIconPath
+    });
+
+    notification.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+
+    notification.show();
+  }
+});
+
+// IPC handler that reads a local file from disk and returns its content to the renderer.
+// Used by the shell context menu flow to convert absolute paths into uploadable File objects.
+ipcMain.handle('read-file-for-upload', async (event, filePath) => {
+  const stat = await fs.promises.stat(filePath);
+  const MAX = 2 * 1024 * 1024 * 1024;
+  if (stat.size > MAX) {
+    throw new Error(`File exceeds the 2 GB upload limit (${(stat.size / 1e9).toFixed(1)} GB).`);
+  }
+  const buffer = await fs.promises.readFile(filePath);
+  // Slice to get a standalone ArrayBuffer (Node Buffer may share a pool)
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  return {
+    arrayBuffer,
+    name: path.basename(filePath),
+    size: stat.size,
+    lastModified: stat.mtimeMs,
+    type: 'application/octet-stream'
+  };
 });
 
 // App Exit Handler

@@ -1,18 +1,17 @@
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import http from 'http';
 import QRCode from 'qrcode';
 import fileRouter from './routes/fileRoutes';
+import { FileController } from './controllers/fileController';
 import { NetworkService } from './services/networkService';
 import { TokenService } from './services/tokenService';
 import { WebSocketService } from './services/websocketService';
+import { MetadataService } from './services/metadataService';
 
 const app = express();
 const PORT = 3000;
 
-// Enable CORS for easy mobile-to-PC resource access
-app.use(cors());
 app.use(express.json());
 
 // Resolve static assets from the path provided by the Electron main process.
@@ -42,15 +41,29 @@ app.get('/config', async (req, res) => {
       req.hostname === 'localhost' ||
       req.hostname === '127.0.0.1';
 
-    const connectionUrl = `http://${localIp}:${PORT}/?token=${token}`;
-    const qrCodeBase64 = await QRCode.toDataURL(connectionUrl);
+    // Always use the session token for the QR / auto-auth URL.
+    // The custom password is a credential remote users type manually — it must never
+    // be embedded in a URL or QR code where it could be captured by cameras or scanner apps.
+    const activeToken = TokenService.getSessionToken();
+
+    const baseConnectionUrl = `http://${localIp}:${PORT}`;
+    // Token-bearing URL and QR code are only generated for the localhost host UI.
+    // External callers receive the bare server address so they can display it,
+    // but cannot extract credentials from the response.
+    const tokenConnectionUrl = `${baseConnectionUrl}/?token=${activeToken}`;
+
+    const qrCodeBase64 = isLocalhost
+      ? await QRCode.toDataURL(tokenConnectionUrl)
+      : null;
 
     res.json({
       ip: localIp,
       port: PORT,
-      token: isLocalhost ? token : null, // Securely hide from external Wi-Fi scanners
-      connectionUrl,
+      token: isLocalhost ? activeToken : null,
+      connectionUrl: isLocalhost ? tokenConnectionUrl : baseConnectionUrl,
       qrCode: qrCodeBase64,
+      uploadsDir: isLocalhost ? FileController.getUploadsDir() : null,
+      isPasswordSet: TokenService.isPasswordEnabled(),
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to generate connection config: ' + error.message });
@@ -70,6 +83,17 @@ const server = http.createServer(app);
 
 // Initialize real-time WebSocket syncing
 WebSocketService.init(server);
+
+// Initialize metadata tracking scavenger daemon
+MetadataService.init();
+
+// Listen for background child-process IPC messages to update uploads directory at runtime
+process.on('message', (message: any) => {
+  if (message && message.type === 'SET_UPLOADS_DIR' && typeof message.path === 'string') {
+    console.log(`[IPC] Updating active uploads directory to: ${message.path}`);
+    FileController.setUploadsDir(message.path);
+  }
+});
 
 // Boot the server
 server.listen(PORT, '0.0.0.0', () => {

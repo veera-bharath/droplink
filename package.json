@@ -20,7 +20,6 @@
   "build": {
     "appId": "com.droplink.app",
     "productName": "DropLink",
-
     "directories": {
       "output": "dist-electron"
     },
@@ -42,7 +41,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DropLink",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "include": "installer/context-menu.nsh"
     },
     "publish": {
       "provider": "github",
@@ -59,14 +59,12 @@
   "author": "Antigravity",
   "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1",
     "qrcode": "^1.5.3",
     "ws": "^8.17.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.11",
     "@types/qrcode": "^1.5.5",
