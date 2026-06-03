@@ -8,22 +8,28 @@
 
 DropLink is a modern, high-performance, and beautifully styled local network file sharing desktop application. It allows you to instantly and securely transfer massive files (up to **2GB**) between your mobile devices and your PC over the same local Wi-Fi network—**consuming zero internet bandwidth and with zero cloud dependency**.
 
-### 📦 [Download Latest Release for Windows (v1.0.0)](https://github.com/veera-bharath/droplink/releases/download/v1.0.0/DropLink-Setup-1.0.0.exe)
+### 📦 [Download Latest Release for Windows (v1.1.0)](https://github.com/veera-bharath/droplink/releases/download/v1.1.0/DropLink-Setup-1.1.0.exe)
 
 ---
 
 ## ✨ Features
 
 - **🚀 Native Desktop App Shell**: Wrapped in a modern, borderless Electron wrapper for a native Windows software feel.
-- **🛡️ Double-Ended Session Security**: Auto-generates a secure, 6-character uppercase security token upon launch. Direct scans of the QR code pre-authenticate mobile devices instantly. 
-- **🔑 Persistent Password Protection**: Set a persistent security password in the Preferences panel. Scans of the QR code dynamically encode the password for frictionless connection, while manual connections can use either the active 6-character session token or your custom password.
+- **🛡️ Double-Ended Session Security**: Auto-generates a secure, 6-character uppercase security token upon launch. Direct scans of the QR code pre-authenticate mobile devices instantly.
+- **🔑 Persistent Password Protection**: Set a persistent security password in the Preferences panel. Manual connections can use either the active 6-character session token or your custom password.
 - **💻 Host Auto-Login**: The app automatically logs you in when opened on `127.0.0.1` (the hosting PC), but requires verification for external local Wi-Fi clients.
 - **📂 Native Windows Downloads Directory**: Uploaded files automatically stream directly into your local `C:\Users\<Name>\Downloads\DropLink` directory rather than hiding in temporary app caches.
+- **📁 Custom Save Directory**: Change the upload destination at runtime from the Preferences panel — pick any folder on any drive without restarting the app.
 - **🔌 EXDEV Multi-Drive Fallback**: Robust, enterprise-grade handling for cross-device filesystem moves. If your project is hosted on a secondary partition (e.g. `D:\`), uploads are cleanly copied and unlinked across volumes onto your primary `C:\` drive Downloads folder.
 - **🔄 Live WebSocket Sync**: A lightweight, native WebSocket connection keeps all connected devices updated in real-time. Files uploaded or deleted on your phone immediately appear or disappear on your PC without page refreshes.
+- **⚡ Parallel Upload Queue**: Upload up to 2 files simultaneously with a live progress queue showing per-file speed, ETA, and individual cancel controls.
+- **🔍 Inline File Preview**: Preview images, videos, audio, PDFs, and code files directly inside the app via a full-screen lightbox — no download required.
+- **💣 Self-Destructing Transfers**: Mark any file to auto-delete after a set number of downloads or after a countdown timer expires.
+- **🖱️ Windows Explorer Context Menu**: Right-click any file in Windows Explorer and choose **"Share with DropLink"** to instantly queue it for transfer — no drag-and-drop required.
+- **🔔 Desktop & Browser Notifications**: Receive native OS notifications (Electron) or browser notifications (mobile) when a new file arrives from a connected device.
 - **🎛️ Windows System Tray Minimizing**: Closing the window minimizes the application into your Windows System Tray next to your clock, keeping your file-sync server running continuously in the background.
-- **⌛ Solid Splash Screen & Port Pinging**: Auto-spawns a modern solid rectangular loading splash screen displaying the official logo (loaded dynamically via Base64 data URLs) and a brand blue loader, running an active `127.0.0.1` TCP-ping loop to bypass loopback DNS hostname resolution conflicts (IPv4 vs. IPv6 `::1`) on Windows.
-- **🎨 Premium Blue Glassmorphic Design**: Curated HSL brand blue accents, responsive fluid grid layouts, modern inline SVG vector headers (replacing legacy emojis), and smooth micro-animations.
+- **⌛ Solid Splash Screen & Port Pinging**: Auto-spawns a modern solid rectangular loading splash screen displaying the official logo and a brand blue loader, running an active `127.0.0.1` TCP-ping loop to bypass loopback DNS hostname resolution conflicts (IPv4 vs. IPv6 `::1`) on Windows.
+- **🎨 Premium Blue Glassmorphic Design**: Curated HSL brand blue accents, responsive fluid grid layouts, modern inline SVG vector headers, and smooth micro-animations.
 
 ---
 
@@ -47,9 +53,10 @@ DropLink is a modern, high-performance, and beautifully styled local network fil
       ├── routes/
       │   └── fileRoutes.ts   # Router mapping, multer setup, and token security checks
       └── services/
-          ├── networkService.ts # Automated physical LAN Wi-Fi IPv4 discovery
-          ├── tokenService.ts   # Generates and validates session tokens
-          └── websocketService.ts # Handles socket connection handshakes and broadcasts
+          ├── networkService.ts   # Automated physical LAN Wi-Fi IPv4 discovery
+          ├── tokenService.ts     # Generates and validates session tokens; manages persistent password
+          ├── websocketService.ts # Handles socket connection handshakes and broadcasts
+          └── metadataService.ts  # Per-file self-destruct metadata; scavenger daemon runs every 5s
 ```
 
 ---
@@ -89,7 +96,7 @@ To package DropLink into a single, double-clickable, redistributable Windows set
    npm run build
    ```
 2. The output installer will be generated in the newly created **`dist-electron/`** folder:
-   - **`DropLink Setup 1.0.0.exe`**: Double-click this file to run a standard Windows Installation Wizard, which automatically places shortcuts on your Desktop and Start Menu and provides a clean uninstaller in your Windows Control Panel.
+   - **`DropLink-Setup-1.1.0.exe`**: Double-click this file to run a standard Windows Installation Wizard, which automatically places shortcuts on your Desktop and Start Menu and provides a clean uninstaller in your Windows Control Panel.
 
 ---
 
